@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="InventoryReorderPlatform.Api/InventoryReorderPlatform.Api.csproj" />
+  <Project Path="InventoryReorderPlatform.AppHost/InventoryReorderPlatform.AppHost.csproj" />
+  <Project Path="InventoryReorderPlatform.Processor/InventoryReorderPlatform.Processor.csproj" />
+  <Project Path="InventoryReorderPlatform.ServiceDefaults/InventoryReorderPlatform.ServiceDefaults.csproj" />
+</Solution>

@@ -1,0 +1,5 @@
+{
+  "appHost": {
+    "path": "InventoryReorderPlatform.AppHost/InventoryReorderPlatform.AppHost.csproj"
+  }
+}

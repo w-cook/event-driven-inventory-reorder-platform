@@ -1,0 +1,73 @@
+# Build output
+[Bb]in/
+[Oo]bj/
+
+# User-specific files
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Visual Studio folders
+.vs/
+
+# Rider / JetBrains
+.idea/
+
+# VS Code
+.vscode/
+
+# Test results
+[Tt]est[Rr]esult*/
+[Bb]enchmark[Dd]ot[Nn]et.Artifacts/
+
+# NuGet
+*.nupkg
+*.snupkg
+packages/
+.nuget/
+
+# Logs
+*.log
+
+# Publish output
+publish/
+
+# Temporary files
+*.tmp
+*.temp
+*.cache
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Environment / secrets
+.env
+.env.*
+appsettings.Development.local.json
+appsettings.Local.json
+secrets.json
+
+# Docker
+docker-compose.override.yml
+
+# Aspire dashboard / local runtime artifacts
+.aspire/
+
+# Generated files
+Generated/
+
+# SQL Server LocalDB / MDF files if any appear locally
+*.mdf
+*.ldf
+
+# Coverage
+coverage/
+coverage.*
+*.coverage
+*.coveragexml
+
+# Node modules if any frontend tooling gets added later
+node_modules/
