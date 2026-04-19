@@ -1,6 +1,25 @@
-@InventoryReorderPlatform.Api_HostAddress = http://localhost:5151
+@InventoryReorderPlatform.Api_HostAddress = https://localhost:7025
 
-GET {{InventoryReorderPlatform.Api_HostAddress}}/weatherforecast/
+### Get all inventory items
+GET {{InventoryReorderPlatform.Api_HostAddress}}/api/inventoryitems
 Accept: application/json
 
 ###
+
+### Create a new inventory item
+POST {{InventoryReorderPlatform.Api_HostAddress}}/api/inventoryitems
+Content-Type: application/json
+
+{
+  "name": "USB-C Docking Station",
+  "sku": "DOCK-1001",
+  "quantityOnHand": 12,
+  "reorderThreshold": 5,
+  "status": "Active"
+}
+
+###
+
+### Get inventory item by id
+GET {{InventoryReorderPlatform.Api_HostAddress}}/api/inventoryitems/1
+Accept: application/json

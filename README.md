@@ -1,6 +1,6 @@
 # Event-Driven Inventory Reorder Platform
 
-A .NET portfolio project focused on event-driven workflow, background processing, and container/cloud-oriented application architecture.
+A .NET portfolio project focused on event-driven workflow, background processing, relational data modeling, and cloud/container-aligned application architecture.
 
 ## Purpose
 
@@ -8,6 +8,7 @@ This project is being built to strengthen the portfolio for traditional remote s
 
 The goal is to demonstrate practical experience with:
 - ASP.NET Core
+- Web API development
 - background processing with a worker service
 - event-driven workflow design
 - Entity Framework Core
@@ -31,6 +32,7 @@ This project is meant to show that I can build more than standard CRUD or server
 It is intended to support roles involving:
 - C# / .NET backend development
 - ASP.NET Core application development
+- Web API development
 - background processing and worker services
 - cloud-aligned application architecture
 - SQL-backed internal business systems
@@ -39,7 +41,7 @@ It is intended to support roles involving:
 ## Planned Tech Stack
 
 - C#
-- ASP.NET Core
+- ASP.NET Core Web API
 - Worker Service
 - .NET Aspire
 - Entity Framework Core
@@ -50,9 +52,9 @@ It is intended to support roles involving:
 
 ## Planned Architecture
 
-The solution is planned as a small multi-project distributed application.
+The solution is structured as a small multi-project distributed application.
 
-Initial projects:
+Projects:
 - `InventoryReorderPlatform.AppHost`
 - `InventoryReorderPlatform.ServiceDefaults`
 - `InventoryReorderPlatform.Api`
@@ -65,7 +67,28 @@ Orchestrates the distributed application locally during development.
 Provides the main application surface for inventory item management, reorder visibility, and administrative workflows.
 
 ### Processor
-Runs background logic for reorder event handling and inventory workflow processing.
+Will run background logic for reorder event handling and inventory workflow processing.
+
+## Current Features
+
+Implemented so far:
+- distributed .NET solution structure using Aspire
+- API project wired into the distributed solution
+- worker project wired into the distributed solution
+- SQL-backed persistence with Entity Framework Core
+- initial relational data model for:
+  - inventory items
+  - reorder events
+  - reorder history
+- `AppDbContext` created and registered
+- SQL Server / LocalDB connection configured
+- initial migration created and database generated
+- first inventory API controller created
+- inventory API endpoints for:
+  - get all inventory items
+  - get inventory item by id
+  - create inventory item
+- DTO-based request/response flow for the first inventory API workflow
 
 ## Planned Core Workflow
 
@@ -77,7 +100,7 @@ The initial workflow is:
 4. a background processor handles the reorder event
 5. reorder activity and status changes are recorded in history
 
-## Planned Data Model
+## Data Model
 
 ### InventoryItem
 - `Id`
@@ -102,6 +125,15 @@ The initial workflow is:
 - `OldStatus`
 - `NewStatus`
 - `ChangedAt`
+
+## Implementation Notes
+
+- `CreatedAt`, `UpdatedAt`, `TriggeredAt`, and `ChangedAt` are server-controlled timestamps.
+- The initial API uses DTOs for inventory item creation and response shaping.
+- The current focus is establishing the domain, data layer, and first working API surface before queue integration and background reorder processing.
+- The solution uses SQL Server LocalDB for development.
+- Aspire is used as the foundation for the distributed application skeleton.
+- The Processor project is currently present as part of the architecture and will be expanded in later implementation steps.
 
 ## Scope Rules
 
@@ -141,11 +173,15 @@ This project exists to add proof of:
 
 ## Current Status
 
-Initial setup and planning in progress.
+Initial implementation in progress.
 
 Completed so far:
 - project direction finalized
-- domain selected
-- initial architecture chosen
-- distributed .NET solution structure started
+- distributed solution structure created
 - Aspire-based application skeleton created
+- API and Processor projects added to the solution
+- initial domain models created
+- EF Core data layer created
+- SQL Server connection configured
+- initial migration created and database applied
+- first inventory API workflow implemented and smoke-tested
