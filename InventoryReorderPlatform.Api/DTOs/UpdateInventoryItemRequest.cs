@@ -2,7 +2,7 @@
 
 namespace InventoryReorderPlatform.Api.DTOs
 {
-    public class CreateInventoryItemRequest
+    public class UpdateInventoryItemRequest
     {
         [Required]
         [StringLength(50)]

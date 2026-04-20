@@ -21,7 +21,7 @@ The goal is to demonstrate practical experience with:
 
 The application models a small internal inventory platform.
 
-Inventory items have stock levels and reorder thresholds. When stock falls below the configured threshold, the system records a reorder event and processes it through a background workflow.
+Inventory items have stock levels and reorder thresholds. When stock falls below the configured threshold, the system creates reorder-related records and prepares them for background processing.
 
 The project is intentionally scoped like a lightweight internal business platform rather than a polished product.
 
@@ -88,7 +88,17 @@ Implemented so far:
   - get all inventory items
   - get inventory item by id
   - create inventory item
-- DTO-based request/response flow for the first inventory API workflow
+  - update inventory item
+- reorder event API endpoint for:
+  - get all reorder events
+- DTO-based request/response flow for the inventory API
+- automatic inventory status calculation based on quantity on hand and reorder threshold
+- automatic transition to:
+  - `Active`
+  - `ReorderPending`
+- automatic reorder event creation when an item transitions into `ReorderPending`
+- automatic reorder history creation when an item status changes
+- duplicate reorder event avoidance when an item remains in the same low-stock state
 
 ## Planned Core Workflow
 
@@ -96,9 +106,10 @@ The initial workflow is:
 
 1. inventory items are created and tracked
 2. each item has a quantity on hand and a reorder threshold
-3. when stock falls below threshold, a reorder event is created
-4. a background processor handles the reorder event
+3. when stock falls below threshold, the item transitions to `ReorderPending`
+4. a reorder event is created when that transition happens
 5. reorder activity and status changes are recorded in history
+6. a background processor will later handle the reorder event workflow
 
 ## Data Model
 
@@ -129,8 +140,14 @@ The initial workflow is:
 ## Implementation Notes
 
 - `CreatedAt`, `UpdatedAt`, `TriggeredAt`, and `ChangedAt` are server-controlled timestamps.
-- The initial API uses DTOs for inventory item creation and response shaping.
-- The current focus is establishing the domain, data layer, and first working API surface before queue integration and background reorder processing.
+- The API uses DTOs for inventory item creation, update, and response shaping.
+- Inventory item status is derived from business rules rather than being posted directly by the client.
+- The current status rule is:
+  - `QuantityOnHand > ReorderThreshold` → `Active`
+  - `QuantityOnHand <= ReorderThreshold` → `ReorderPending`
+- Reorder events are created only when an item transitions into `ReorderPending`, which avoids duplicate event creation on repeated low-stock updates.
+- Reorder history entries are created whenever item status changes.
+- The current focus is establishing the domain, data layer, and first meaningful reorder workflow before queue integration and Processor-side event handling.
 - The solution uses SQL Server LocalDB for development.
 - Aspire is used as the foundation for the distributed application skeleton.
 - The Processor project is currently present as part of the architecture and will be expanded in later implementation steps.
@@ -185,3 +202,6 @@ Completed so far:
 - SQL Server connection configured
 - initial migration created and database applied
 - first inventory API workflow implemented and smoke-tested
+- reorder status logic added to create and update workflows
+- automatic reorder event and reorder history generation implemented and tested
+- reorder event inspection endpoint implemented

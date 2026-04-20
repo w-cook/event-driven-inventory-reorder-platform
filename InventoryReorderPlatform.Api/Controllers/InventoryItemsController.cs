@@ -1,6 +1,6 @@
 ﻿using InventoryReorderPlatform.Api.Data;
-using InventoryReorderPlatform.Api.Models;
 using InventoryReorderPlatform.Api.DTOs;
+using InventoryReorderPlatform.Api.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -61,7 +61,7 @@ namespace InventoryReorderPlatform.Api.Controllers
                 Sku = request.Sku.Trim(),
                 QuantityOnHand = request.QuantityOnHand,
                 ReorderThreshold = request.ReorderThreshold,
-                Status = request.Status.Trim(),
+                Status = "Active",
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             };
@@ -69,10 +69,83 @@ namespace InventoryReorderPlatform.Api.Controllers
             _dbContext.InventoryItems.Add(inventoryItem);
             await _dbContext.SaveChangesAsync();
 
+            await ApplyInventoryStatusWorkflowAsync(inventoryItem);
+            await _dbContext.SaveChangesAsync();
+
             return CreatedAtAction(
                 nameof(GetById),
                 new { id = inventoryItem.Id },
                 MapInventoryItemToResponse(inventoryItem));
+        }
+
+        [HttpPut("{id:int}")]
+        public async Task<ActionResult<InventoryItemResponse>> UpdateInventoryItem(
+            [FromRoute] int id,
+            UpdateInventoryItemRequest request)
+        {
+            var inventoryItem = await _dbContext.InventoryItems
+                .FirstOrDefaultAsync(i => i.Id == id);
+
+            if (inventoryItem == null)
+            {
+                return NotFound($"InventoryItemId '{id}' does not exist.");
+            }
+
+            inventoryItem.Name = request.Name.Trim();
+            inventoryItem.Sku = request.Sku.Trim();
+            inventoryItem.QuantityOnHand = request.QuantityOnHand;
+            inventoryItem.ReorderThreshold = request.ReorderThreshold;
+
+            if (!await ApplyInventoryStatusWorkflowAsync(inventoryItem))
+            {
+                inventoryItem.UpdatedAt = DateTime.UtcNow;
+            }
+
+            await _dbContext.SaveChangesAsync();
+
+            return Ok(MapInventoryItemToResponse(inventoryItem));
+        }
+
+        private async Task<bool> ApplyInventoryStatusWorkflowAsync(InventoryItem inventoryItem)
+        {
+            var targetStatus = inventoryItem.QuantityOnHand <= inventoryItem.ReorderThreshold
+                ? "ReorderPending"
+                : "Active";
+
+            var oldStatus = inventoryItem.Status;
+
+            if (targetStatus == oldStatus)
+            {
+                return false;
+            }
+
+            var historyEntry = new ReorderHistory
+            {
+                InventoryItemId = inventoryItem.Id,
+                OldStatus = oldStatus,
+                NewStatus = targetStatus,
+                ChangedAt = DateTime.UtcNow
+            };
+
+            await _dbContext.ReorderHistoryEntries.AddAsync(historyEntry);
+
+            if (targetStatus == "ReorderPending")
+            {
+                var reorderEvent = new ReorderEvent
+                {
+                    InventoryItemId = inventoryItem.Id,
+                    QuantityAtTrigger = inventoryItem.QuantityOnHand,
+                    TriggeredAt = DateTime.UtcNow,
+                    Status = targetStatus
+                };
+
+                await _dbContext.ReorderEvents.AddAsync(reorderEvent);
+            }
+
+            inventoryItem.Status = targetStatus;
+            inventoryItem.UpdatedAt = DateTime.UtcNow;
+
+            return true;
         }
 
         private static InventoryItemResponse MapInventoryItemToResponse(InventoryItem inventoryItem)
