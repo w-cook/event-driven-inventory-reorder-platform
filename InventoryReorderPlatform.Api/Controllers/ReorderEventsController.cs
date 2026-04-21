@@ -1,4 +1,4 @@
-﻿using InventoryReorderPlatform.Api.Data;
+﻿using InventoryReorderPlatform.Data;
 using InventoryReorderPlatform.Api.DTOs;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;

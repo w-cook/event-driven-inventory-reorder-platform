@@ -1,4 +1,4 @@
-using InventoryReorderPlatform.Api.Data;
+using InventoryReorderPlatform.Data;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);

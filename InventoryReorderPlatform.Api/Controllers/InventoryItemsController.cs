@@ -1,6 +1,6 @@
-﻿using InventoryReorderPlatform.Api.Data;
+﻿using InventoryReorderPlatform.Data;
 using InventoryReorderPlatform.Api.DTOs;
-using InventoryReorderPlatform.Api.Models;
+using InventoryReorderPlatform.Data.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -136,7 +136,7 @@ namespace InventoryReorderPlatform.Api.Controllers
                     InventoryItemId = inventoryItem.Id,
                     QuantityAtTrigger = inventoryItem.QuantityOnHand,
                     TriggeredAt = DateTime.UtcNow,
-                    Status = targetStatus
+                    Status = "Pending"
                 };
 
                 await _dbContext.ReorderEvents.AddAsync(reorderEvent);

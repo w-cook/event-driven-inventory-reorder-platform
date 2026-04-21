@@ -1,5 +1,5 @@
 ﻿using System.ComponentModel.DataAnnotations;
-using InventoryReorderPlatform.Api.Models;
+using InventoryReorderPlatform.Data.Models;
 
 namespace InventoryReorderPlatform.Api.DTOs
 {

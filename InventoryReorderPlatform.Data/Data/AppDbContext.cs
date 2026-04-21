@@ -1,7 +1,7 @@
-﻿using InventoryReorderPlatform.Api.Models;
+﻿using InventoryReorderPlatform.Data.Models;
 using Microsoft.EntityFrameworkCore;
 
-namespace InventoryReorderPlatform.Api.Data
+namespace InventoryReorderPlatform.Data
 {
     public class AppDbContext : DbContext
     {

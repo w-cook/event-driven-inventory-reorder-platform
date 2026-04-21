@@ -2,8 +2,8 @@
 
 ###
 # After running the first two POSTs, replace these with the real IDs returned
-@activeItemId = 2
-@lowStockItemId = 3
+@activeItemId = 1
+@lowStockItemId = 2
 
 ###
 # 1) Create item ABOVE threshold -> should become Active

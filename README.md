@@ -21,7 +21,7 @@ The goal is to demonstrate practical experience with:
 
 The application models a small internal inventory platform.
 
-Inventory items have stock levels and reorder thresholds. When stock falls below the configured threshold, the system creates reorder-related records and prepares them for background processing.
+Inventory items have stock levels and reorder thresholds. When stock falls below the configured threshold, the system creates reorder-related records and prepares them for background processing. A separate processor service consumes pending reorder events and marks them as processed.
 
 The project is intentionally scoped like a lightweight internal business platform rather than a polished product.
 
@@ -50,7 +50,7 @@ It is intended to support roles involving:
 - Azure Container Apps (deployment target)
 - Azure Service Bus (planned event transport)
 
-## Planned Architecture
+## Architecture
 
 The solution is structured as a small multi-project distributed application.
 
@@ -59,6 +59,7 @@ Projects:
 - `InventoryReorderPlatform.ServiceDefaults`
 - `InventoryReorderPlatform.Api`
 - `InventoryReorderPlatform.Processor`
+- `InventoryReorderPlatform.Data`
 
 ### AppHost
 Orchestrates the distributed application locally during development.
@@ -67,23 +68,26 @@ Orchestrates the distributed application locally during development.
 Provides the main application surface for inventory item management, reorder visibility, and administrative workflows.
 
 ### Processor
-Will run background logic for reorder event handling and inventory workflow processing.
+Runs background logic for reorder event handling and inventory workflow processing.
+
+### Data
+Holds the shared EF Core data layer used by both the API and the Processor, including:
+- entity models
+- `AppDbContext`
 
 ## Current Features
 
 Implemented so far:
 - distributed .NET solution structure using Aspire
-- API project wired into the distributed solution
-- worker project wired into the distributed solution
+- shared data layer used by both the API and Processor
 - SQL-backed persistence with Entity Framework Core
 - initial relational data model for:
   - inventory items
   - reorder events
   - reorder history
-- `AppDbContext` created and registered
+- `AppDbContext` created and shared across projects
 - SQL Server / LocalDB connection configured
 - initial migration created and database generated
-- first inventory API controller created
 - inventory API endpoints for:
   - get all inventory items
   - get inventory item by id
@@ -99,17 +103,29 @@ Implemented so far:
 - automatic reorder event creation when an item transitions into `ReorderPending`
 - automatic reorder history creation when an item status changes
 - duplicate reorder event avoidance when an item remains in the same low-stock state
+- reorder event processing states:
+  - `Pending`
+  - `Processed`
+- background processor that:
+  - polls for pending reorder events
+  - processes them in batches
+  - marks them as processed
+  - logs processing activity
+- end-to-end producer/consumer workflow running under Aspire:
+  - API creates pending reorder events
+  - Processor consumes and processes them
 
-## Planned Core Workflow
+## Core Workflow
 
-The initial workflow is:
+The current workflow is:
 
 1. inventory items are created and tracked
 2. each item has a quantity on hand and a reorder threshold
 3. when stock falls below threshold, the item transitions to `ReorderPending`
-4. a reorder event is created when that transition happens
-5. reorder activity and status changes are recorded in history
-6. a background processor will later handle the reorder event workflow
+4. a reorder event is created with `Status = "Pending"`
+5. the Processor finds pending reorder events in the background
+6. the Processor marks those events as `Processed`
+7. reorder activity and status changes remain recorded in history
 
 ## Data Model
 
@@ -142,15 +158,18 @@ The initial workflow is:
 - `CreatedAt`, `UpdatedAt`, `TriggeredAt`, and `ChangedAt` are server-controlled timestamps.
 - The API uses DTOs for inventory item creation, update, and response shaping.
 - Inventory item status is derived from business rules rather than being posted directly by the client.
-- The current status rule is:
+- The current item status rule is:
   - `QuantityOnHand > ReorderThreshold` → `Active`
   - `QuantityOnHand <= ReorderThreshold` → `ReorderPending`
+- Reorder event status is now separate from inventory item status:
+  - reorder event status = `Pending` / `Processed`
+  - inventory item status = `Active` / `ReorderPending`
 - Reorder events are created only when an item transitions into `ReorderPending`, which avoids duplicate event creation on repeated low-stock updates.
 - Reorder history entries are created whenever item status changes.
-- The current focus is establishing the domain, data layer, and first meaningful reorder workflow before queue integration and Processor-side event handling.
+- The Processor currently uses the shared EF Core data layer and database polling to process reorder events.
+- Background processing is currently database-driven; Azure Service Bus integration is planned as a later enhancement.
 - The solution uses SQL Server LocalDB for development.
-- Aspire is used as the foundation for the distributed application skeleton.
-- The Processor project is currently present as part of the architecture and will be expanded in later implementation steps.
+- Aspire is used as the foundation for the distributed application skeleton and local multi-project orchestration.
 
 ## Scope Rules
 
@@ -185,23 +204,25 @@ The earlier portfolio projects already demonstrate:
 This project exists to add proof of:
 - background worker design
 - event-driven processing
+- multi-project distributed application structure
 - cloud/container-aligned .NET architecture
 - a different business domain from tickets, service requests, or support portals
 
 ## Current Status
 
-Initial implementation in progress.
+Implementation in progress.
 
 Completed so far:
 - project direction finalized
 - distributed solution structure created
 - Aspire-based application skeleton created
-- API and Processor projects added to the solution
+- API, Processor, and shared Data projects added to the solution
 - initial domain models created
-- EF Core data layer created
+- EF Core data layer created and shared across projects
 - SQL Server connection configured
 - initial migration created and database applied
-- first inventory API workflow implemented and smoke-tested
+- inventory API workflow implemented and smoke-tested
 - reorder status logic added to create and update workflows
 - automatic reorder event and reorder history generation implemented and tested
 - reorder event inspection endpoint implemented
+- Processor connected to the shared database and processing pending reorder events in the background

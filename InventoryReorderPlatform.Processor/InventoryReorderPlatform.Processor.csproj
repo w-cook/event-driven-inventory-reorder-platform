@@ -12,6 +12,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\InventoryReorderPlatform.Data\InventoryReorderPlatform.Data.csproj" />
     <ProjectReference Include="..\InventoryReorderPlatform.ServiceDefaults\InventoryReorderPlatform.ServiceDefaults.csproj" />
   </ItemGroup>
 </Project>

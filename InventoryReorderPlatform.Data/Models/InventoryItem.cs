@@ -1,7 +1,7 @@
 ﻿using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 
-namespace InventoryReorderPlatform.Api.Models
+namespace InventoryReorderPlatform.Data.Models
 {
     public class InventoryItem
     {

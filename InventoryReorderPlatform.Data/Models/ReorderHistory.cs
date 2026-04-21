@@ -2,7 +2,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.Xml.Linq;
 
-namespace InventoryReorderPlatform.Api.Models
+namespace InventoryReorderPlatform.Data.Models
 {
     public class ReorderHistory
     {

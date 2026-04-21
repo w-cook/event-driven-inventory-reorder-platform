@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace InventoryReorderPlatform.Api.Migrations
+namespace InventoryReorderPlatform.Data.Migrations
 {
     /// <inheritdoc />
     public partial class InitialInventorySchema : Migration
