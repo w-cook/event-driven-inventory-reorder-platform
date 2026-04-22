@@ -5,13 +5,19 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UserSecretsId>dotnet-InventoryReorderPlatform.Processor-d564f329-090b-4f35-8afd-b9dc7543590c</UserSecretsId>
+    <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Aspire.Microsoft.EntityFrameworkCore.SqlServer" Version="13.2.3" />
+    <PackageReference Include="Azure.Identity" Version="1.21.0" />
+    <PackageReference Include="Azure.Messaging.ServiceBus" Version="7.20.1" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.5" />
+    <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.23.0" />
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\InventoryReorderPlatform.Contracts\InventoryReorderPlatform.Contracts.csproj" />
     <ProjectReference Include="..\InventoryReorderPlatform.Data\InventoryReorderPlatform.Data.csproj" />
     <ProjectReference Include="..\InventoryReorderPlatform.ServiceDefaults\InventoryReorderPlatform.ServiceDefaults.csproj" />
   </ItemGroup>

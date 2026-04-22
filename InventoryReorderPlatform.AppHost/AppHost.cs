@@ -1,7 +1,16 @@
 var builder = DistributedApplication.CreateBuilder(args);
 
-builder.AddProject<Projects.InventoryReorderPlatform_Api>("inventoryreorderplatform-api");
+var sql = builder.AddSqlServer("sql")
+                 .WithLifetime(ContainerLifetime.Persistent);
 
-builder.AddProject<Projects.InventoryReorderPlatform_Processor>("inventoryreorderplatform-processor");
+var inventorydb = sql.AddDatabase("inventorydb");
+
+builder.AddProject<Projects.InventoryReorderPlatform_Api>("api")
+       .WithReference(inventorydb)
+       .WaitFor(inventorydb);
+
+builder.AddProject<Projects.InventoryReorderPlatform_Processor>("processor")
+       .WithReference(inventorydb)
+       .WaitFor(inventorydb);
 
 builder.Build().Run();

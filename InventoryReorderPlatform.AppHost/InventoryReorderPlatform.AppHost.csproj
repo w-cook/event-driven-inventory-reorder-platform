@@ -13,4 +13,8 @@
     <ProjectReference Include="..\InventoryReorderPlatform.Processor\InventoryReorderPlatform.Processor.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+	<PackageReference Include="Aspire.Hosting.SqlServer" Version="*" />
+  </ItemGroup>
+
 </Project>

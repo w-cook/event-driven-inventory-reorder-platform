@@ -1,6 +1,7 @@
 <Solution>
   <Project Path="InventoryReorderPlatform.Api/InventoryReorderPlatform.Api.csproj" />
   <Project Path="InventoryReorderPlatform.AppHost/InventoryReorderPlatform.AppHost.csproj" />
+  <Project Path="InventoryReorderPlatform.Contracts/InventoryReorderPlatform.Contracts.csproj" Id="503bb007-8be0-4bff-a128-38357834a834" />
   <Project Path="InventoryReorderPlatform.Data/InventoryReorderPlatform.Data.csproj" Id="a61d0f03-da3c-450a-b3fd-925baff7831f" />
   <Project Path="InventoryReorderPlatform.Processor/InventoryReorderPlatform.Processor.csproj" />
   <Project Path="InventoryReorderPlatform.ServiceDefaults/InventoryReorderPlatform.ServiceDefaults.csproj" />

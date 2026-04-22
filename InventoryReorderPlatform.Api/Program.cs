@@ -1,3 +1,4 @@
+using InventoryReorderPlatform.Contracts.Configuration;
 using InventoryReorderPlatform.Data;
 using Microsoft.EntityFrameworkCore;
 
@@ -5,30 +6,23 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
 
+builder.AddSqlServerDbContext<AppDbContext>(connectionName: "inventorydb");
+
 // Add services to the container.
-
 builder.Services.AddControllers();
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-builder.Services.AddOpenApi();
 
-builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlServer(
-        builder.Configuration.GetConnectionString("DefaultConnection")));
+builder.Services.Configure<ServiceBusOptions>(
+    builder.Configuration.GetSection("ServiceBus"));
 
 var app = builder.Build();
 
-app.MapDefaultEndpoints();
-
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
+using (var scope = app.Services.CreateScope())
 {
-    app.MapOpenApi();
+    var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    dbContext.Database.Migrate();
 }
 
-app.UseHttpsRedirection();
-
-app.UseAuthorization();
-
+app.MapDefaultEndpoints();
 app.MapControllers();
 
 app.Run();

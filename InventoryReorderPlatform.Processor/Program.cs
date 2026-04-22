@@ -1,16 +1,17 @@
+using InventoryReorderPlatform.Contracts.Configuration;
 using InventoryReorderPlatform.Data;
 using InventoryReorderPlatform.Processor;
-using Microsoft.EntityFrameworkCore;
 
 var builder = Host.CreateApplicationBuilder(args);
 
 builder.AddServiceDefaults();
 
-builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlServer(
-        builder.Configuration.GetConnectionString("DefaultConnection")));
+builder.AddSqlServerDbContext<AppDbContext>(connectionName: "inventorydb");
 
 builder.Services.AddHostedService<Worker>();
+
+builder.Services.Configure<ServiceBusOptions>(
+    builder.Configuration.GetSection("ServiceBus"));
 
 var host = builder.Build();
 host.Run();
