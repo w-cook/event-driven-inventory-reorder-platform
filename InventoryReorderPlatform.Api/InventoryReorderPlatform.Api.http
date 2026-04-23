@@ -105,3 +105,27 @@ Accept: application/json
 # 13) Final reorder event check
 GET {{InventoryReorderPlatform.Api_HostAddress}}/api/reorderevents
 Accept: application/json
+
+###
+# Create item ABOVE threshold -> should become Active
+POST {{InventoryReorderPlatform.Api_HostAddress}}/api/inventoryitems
+Content-Type: application/json
+
+{
+  "name": "Keyboard",
+  "sku": "KEY-1001",
+  "quantityOnHand": 20,
+  "reorderThreshold": 5
+}
+
+###
+# Create item AT OR BELOW threshold -> should become ReorderPending
+POST {{InventoryReorderPlatform.Api_HostAddress}}/api/inventoryitems
+Content-Type: application/json
+
+{
+  "name": "Dock",
+  "sku": "DOCK-2001",
+  "quantityOnHand": 3,
+  "reorderThreshold": 5
+}

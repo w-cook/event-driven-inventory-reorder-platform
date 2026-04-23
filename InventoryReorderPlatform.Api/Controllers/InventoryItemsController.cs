@@ -1,5 +1,7 @@
-﻿using InventoryReorderPlatform.Data;
-using InventoryReorderPlatform.Api.DTOs;
+﻿using InventoryReorderPlatform.Api.DTOs;
+using InventoryReorderPlatform.Api.Services;
+using InventoryReorderPlatform.Contracts.Messages;
+using InventoryReorderPlatform.Data;
 using InventoryReorderPlatform.Data.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -11,10 +13,17 @@ namespace InventoryReorderPlatform.Api.Controllers
     public class InventoryItemsController : ControllerBase
     {
         private readonly AppDbContext _dbContext;
+        private readonly ReorderMessagePublisher _reorderMessagePublisher;
+        private readonly ILogger<InventoryItemsController> _logger;
 
-        public InventoryItemsController(AppDbContext dbContext)
+        public InventoryItemsController(
+            AppDbContext dbContext,
+            ReorderMessagePublisher reorderMessagePublisher,
+            ILogger<InventoryItemsController> logger)
         {
             _dbContext = dbContext;
+            _reorderMessagePublisher = reorderMessagePublisher;
+            _logger = logger;
         }
 
         [HttpGet("{id:int}")]
@@ -69,8 +78,21 @@ namespace InventoryReorderPlatform.Api.Controllers
             _dbContext.InventoryItems.Add(inventoryItem);
             await _dbContext.SaveChangesAsync();
 
-            await ApplyInventoryStatusWorkflowAsync(inventoryItem);
+            var newReorderEvent = await ApplyInventoryStatusWorkflowAsync(inventoryItem);
             await _dbContext.SaveChangesAsync();
+
+            if (newReorderEvent != null)
+            {
+                try
+                {
+                    await PublishReorderMessageAsync(newReorderEvent, inventoryItem);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to publish reorder message for event {ReorderEventId}.", newReorderEvent.Id);
+                    throw;
+                }
+            }
 
             return CreatedAtAction(
                 nameof(GetById),
@@ -96,17 +118,32 @@ namespace InventoryReorderPlatform.Api.Controllers
             inventoryItem.QuantityOnHand = request.QuantityOnHand;
             inventoryItem.ReorderThreshold = request.ReorderThreshold;
 
-            if (!await ApplyInventoryStatusWorkflowAsync(inventoryItem))
+            var newReorderEvent = await ApplyInventoryStatusWorkflowAsync(inventoryItem);
+
+            if (newReorderEvent == null)
             {
                 inventoryItem.UpdatedAt = DateTime.UtcNow;
             }
 
             await _dbContext.SaveChangesAsync();
 
+            if (newReorderEvent != null)
+            {
+                try
+                {
+                    await PublishReorderMessageAsync(newReorderEvent, inventoryItem);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to publish reorder message for event {ReorderEventId}.", newReorderEvent.Id);
+                    throw;
+                }
+            }
+
             return Ok(MapInventoryItemToResponse(inventoryItem));
         }
 
-        private async Task<bool> ApplyInventoryStatusWorkflowAsync(InventoryItem inventoryItem)
+        private async Task<ReorderEvent?> ApplyInventoryStatusWorkflowAsync(InventoryItem inventoryItem)
         {
             var targetStatus = inventoryItem.QuantityOnHand <= inventoryItem.ReorderThreshold
                 ? "ReorderPending"
@@ -116,7 +153,7 @@ namespace InventoryReorderPlatform.Api.Controllers
 
             if (targetStatus == oldStatus)
             {
-                return false;
+                return null;
             }
 
             var historyEntry = new ReorderHistory
@@ -129,9 +166,11 @@ namespace InventoryReorderPlatform.Api.Controllers
 
             await _dbContext.ReorderHistoryEntries.AddAsync(historyEntry);
 
+            ReorderEvent? newReorderEvent = null;
+
             if (targetStatus == "ReorderPending")
             {
-                var reorderEvent = new ReorderEvent
+                newReorderEvent = new ReorderEvent
                 {
                     InventoryItemId = inventoryItem.Id,
                     QuantityAtTrigger = inventoryItem.QuantityOnHand,
@@ -139,13 +178,25 @@ namespace InventoryReorderPlatform.Api.Controllers
                     Status = "Pending"
                 };
 
-                await _dbContext.ReorderEvents.AddAsync(reorderEvent);
+                await _dbContext.ReorderEvents.AddAsync(newReorderEvent);
             }
 
             inventoryItem.Status = targetStatus;
             inventoryItem.UpdatedAt = DateTime.UtcNow;
 
-            return true;
+            return newReorderEvent;
+        }
+
+        private async Task PublishReorderMessageAsync(ReorderEvent reorderEvent, InventoryItem inventoryItem)
+        {
+            await _reorderMessagePublisher.PublishAsync(new ReorderRequestedMessage
+            {
+                ReorderEventId = reorderEvent.Id,
+                InventoryItemId = inventoryItem.Id,
+                Sku = inventoryItem.Sku,
+                QuantityAtTrigger = reorderEvent.QuantityAtTrigger,
+                TriggeredAt = reorderEvent.TriggeredAt
+            });
         }
 
         private static InventoryItemResponse MapInventoryItemToResponse(InventoryItem inventoryItem)

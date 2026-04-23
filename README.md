@@ -1,6 +1,6 @@
 # Event-Driven Inventory Reorder Platform
 
-A .NET portfolio project focused on event-driven workflow, background processing, relational data modeling, containerized local development, and cloud-aligned application architecture.
+A .NET portfolio project focused on event-driven workflow, background processing, relational data modeling, containerized local development, and cloud-ready application architecture.
 
 ## Purpose
 
@@ -14,15 +14,15 @@ The goal is to demonstrate practical experience with:
 - Entity Framework Core
 - SQL Server
 - distributed application structure
-- containerized development
-- cloud-aligned .NET application architecture
-- Azure-oriented messaging and deployment preparation
+- containerized local development
+- cloud-compatible messaging architecture
+- zero-cost local infrastructure emulation for development and testing
 
 ## Project Concept
 
 The application models a small internal inventory platform.
 
-Inventory items have stock levels and reorder thresholds. When stock falls below the configured threshold, the system creates reorder-related records and prepares them for background processing. A separate processor service consumes pending reorder events and marks them as processed.
+Inventory items have stock levels and reorder thresholds. When stock falls below the configured threshold, the system creates reorder-related records and publishes a reorder message. A separate processor service consumes that message and marks the reorder event as processed.
 
 The project is intentionally scoped like a lightweight internal business platform rather than a polished product.
 
@@ -35,12 +35,12 @@ It is intended to support roles involving:
 - ASP.NET Core application development
 - Web API development
 - background processing and worker services
-- cloud-aligned application architecture
-- SQL-backed internal business systems
 - event-driven workflow thinking
-- container-based application development
+- SQL-backed internal business systems
+- container-based development
+- cloud-ready distributed application design
 
-## Planned Tech Stack
+## Tech Stack
 
 - C#
 - ASP.NET Core Web API
@@ -49,8 +49,8 @@ It is intended to support roles involving:
 - Entity Framework Core
 - SQL Server
 - Docker
-- Azure Container Apps (deployment target)
-- Azure Service Bus
+- Azure Service Bus client libraries
+- Azure Service Bus Emulator for local development/testing
 
 ## Architecture
 
@@ -71,7 +71,7 @@ Orchestrates the distributed application locally during development.
 Provides the main application surface for inventory item management, reorder visibility, and administrative workflows.
 
 ### Processor
-Runs background logic for reorder event handling and inventory workflow processing.
+Runs background logic for reorder message consumption and reorder-event processing.
 
 ### Data
 Holds the shared EF Core data layer used by both the API and the Processor, including:
@@ -113,23 +113,22 @@ Implemented so far:
 - reorder event processing states:
   - `Pending`
   - `Processed`
+- queue-based reorder message publishing from the API
+- queue-based reorder message consumption in the Processor
 - background processor that:
-  - polls for pending reorder events
-  - processes them in batches
-  - marks them as processed
+  - consumes reorder messages from the Service Bus emulator
+  - marks matching reorder events as processed
   - logs processing activity
-- end-to-end producer/consumer workflow running under Aspire:
+- end-to-end producer/consumer workflow running locally:
   - API creates pending reorder events
-  - Processor consumes and processes them
+  - API publishes reorder messages
+  - Processor consumes reorder messages
+  - Processor marks reorder events as processed
 - container-friendly SQL Server development path through Aspire-managed infrastructure
 - Docker support added for:
   - `InventoryReorderPlatform.Api`
   - `InventoryReorderPlatform.Processor`
-- Azure Service Bus groundwork added:
-  - package references
-  - shared options class
-  - shared reorder message contract
-  - configuration placeholders
+- zero-cost Azure-compatible messaging development using the official Azure Service Bus Emulator
 
 ## Core Workflow
 
@@ -139,14 +138,10 @@ The current workflow is:
 2. each item has a quantity on hand and a reorder threshold
 3. when stock falls below threshold, the item transitions to `ReorderPending`
 4. a reorder event is created with `Status = "Pending"`
-5. the Processor finds pending reorder events in the background
-6. the Processor marks those events as `Processed`
-7. reorder activity and status changes remain recorded in history
-
-The next workflow step is:
-- publish reorder messages to Azure Service Bus
-- consume those messages from the Processor
-- continue tracking processing state through the database-backed workflow
+5. the API publishes a `ReorderRequestedMessage`
+6. the Processor consumes that message from the queue
+7. the Processor marks the matching reorder event as `Processed`
+8. reorder activity and status changes remain recorded in history
 
 ## Data Model
 
@@ -187,11 +182,11 @@ The next workflow step is:
   - inventory item status = `Active` / `ReorderPending`
 - Reorder events are created only when an item transitions into `ReorderPending`, which avoids duplicate event creation on repeated low-stock updates.
 - Reorder history entries are created whenever item status changes.
-- The Processor currently uses the shared EF Core data layer and database polling to process reorder events.
-- The normal development runtime path is now container-friendly rather than LocalDB-dependent.
+- The Processor now uses queue-based message consumption as the primary reorder-processing workflow.
+- The normal development runtime path is container-friendly rather than LocalDB-dependent.
 - Docker support has been added for the API and Processor projects.
-- Azure Service Bus structure is now present through shared configuration and message contracts, but full publish/consume integration is still in progress.
-- Aspire is used as the foundation for the distributed application skeleton and local multi-project orchestration.
+- Messaging is implemented and tested locally against the official Azure Service Bus Emulator to keep the project zero-cost while staying Azure-compatible.
+- The project is cloud-ready in structure, but the published version is intentionally local/emulator-based rather than deployed to paid Azure resources.
 
 ## Scope Rules
 
@@ -204,7 +199,7 @@ This project should stay compact, employer-facing, and meaningfully different fr
 - relational data modeling
 - event-driven workflow
 - container-aware project structure
-- cloud-aligned messaging/deployment preparation
+- zero-cost cloud-compatible local development
 - clear documentation
 
 ### Out of scope
@@ -228,7 +223,8 @@ This project exists to add proof of:
 - background worker design
 - event-driven processing
 - multi-project distributed application structure
-- cloud/container-aligned .NET architecture
+- containerized local infrastructure
+- cloud-compatible architecture
 - a different business domain from tickets, service requests, or support portals
 
 ## Current Status
@@ -246,7 +242,7 @@ Completed so far:
 - reorder status logic added to create and update workflows
 - automatic reorder event and reorder history generation implemented and tested
 - reorder event inspection endpoint implemented
-- Processor connected to the shared database and processing pending reorder events in the background
-- container-friendly runtime infrastructure started through Aspire-managed SQL Server
+- Processor connected to the shared database
 - Docker support added to API and Processor
-- Azure Service Bus groundwork added in preparation for full queue integration
+- official Azure Service Bus Emulator integrated for zero-cost local queue development
+- queue-based publish/consume workflow implemented and tested end-to-end

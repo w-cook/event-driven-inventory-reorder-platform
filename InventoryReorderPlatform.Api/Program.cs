@@ -1,3 +1,5 @@
+using Azure.Messaging.ServiceBus;
+using InventoryReorderPlatform.Api.Services;
 using InventoryReorderPlatform.Contracts.Configuration;
 using InventoryReorderPlatform.Data;
 using Microsoft.EntityFrameworkCore;
@@ -13,6 +15,16 @@ builder.Services.AddControllers();
 
 builder.Services.Configure<ServiceBusOptions>(
     builder.Configuration.GetSection("ServiceBus"));
+
+builder.Services.AddSingleton(sp =>
+{
+    var options = sp.GetRequiredService<
+        Microsoft.Extensions.Options.IOptions<ServiceBusOptions>>().Value;
+
+    return new ServiceBusClient(options.ConnectionString);
+});
+
+builder.Services.AddSingleton<ReorderMessagePublisher>();
 
 var app = builder.Build();
 

@@ -1,6 +1,6 @@
 ﻿namespace InventoryReorderPlatform.Contracts.Messages
 {
-    internal class ReorderRequestedMessage
+    public class ReorderRequestedMessage
     {
         public int ReorderEventId { get; set; }
         public int InventoryItemId { get; set; }
