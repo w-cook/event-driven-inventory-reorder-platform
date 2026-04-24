@@ -49,6 +49,7 @@ It is intended to support roles involving:
 - Entity Framework Core
 - SQL Server
 - Docker
+- Docker Compose
 - Azure Service Bus client libraries
 - Azure Service Bus Emulator for local development/testing
 
@@ -129,6 +130,14 @@ Implemented so far:
   - `InventoryReorderPlatform.Api`
   - `InventoryReorderPlatform.Processor`
 - zero-cost Azure-compatible messaging development using the official Azure Service Bus Emulator
+- root-level Docker Compose local stack for:
+  - API
+  - Processor
+  - application SQL Server
+  - Service Bus emulator
+  - Service Bus emulator SQL dependency
+- containerized local run path validated end-to-end
+- Aspire run path still working alongside the Docker Compose local stack
 
 ## Core Workflow
 
@@ -169,6 +178,45 @@ The current workflow is:
 - `NewStatus`
 - `ChangedAt`
 
+## Running the Project Locally
+
+### Aspire mode
+Best for normal development and debugging.
+
+- run the AppHost project from Visual Studio
+- this starts the distributed app locally through Aspire orchestration
+- for reorder-message publishing/consumption tests, make sure the Service Bus emulator is running
+
+### Docker / local stack mode
+Best for demonstrating the local containerized distributed system.
+
+From the repository root, run:
+
+```bash
+docker compose -f docker-compose.local.yml build
+docker compose -f docker-compose.local.yml up -d
+docker compose -f docker-compose.local.yml ps
+```
+
+The local stack includes:
+- application SQL Server
+- Service Bus emulator
+- Service Bus emulator SQL dependency
+- API
+- Processor
+
+The API is exposed locally on:
+
+`http://localhost:8080`
+
+Useful commands:
+
+```bash
+docker compose -f docker-compose.local.yml logs -f api
+docker compose -f docker-compose.local.yml logs -f processor
+docker compose -f docker-compose.local.yml down
+```
+
 ## Implementation Notes
 
 - `CreatedAt`, `UpdatedAt`, `TriggeredAt`, and `ChangedAt` are server-controlled timestamps.
@@ -184,7 +232,7 @@ The current workflow is:
 - Reorder history entries are created whenever item status changes.
 - The Processor now uses queue-based message consumption as the primary reorder-processing workflow.
 - The normal development runtime path is container-friendly rather than LocalDB-dependent.
-- Docker support has been added for the API and Processor projects.
+- Docker support has been added to the API and Processor projects.
 - Messaging is implemented and tested locally against the official Azure Service Bus Emulator to keep the project zero-cost while staying Azure-compatible.
 - The project is cloud-ready in structure, but the published version is intentionally local/emulator-based rather than deployed to paid Azure resources.
 
@@ -246,3 +294,4 @@ Completed so far:
 - Docker support added to API and Processor
 - official Azure Service Bus Emulator integrated for zero-cost local queue development
 - queue-based publish/consume workflow implemented and tested end-to-end
+- Docker Compose local stack implemented and validated

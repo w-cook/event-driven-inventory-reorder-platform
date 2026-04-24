@@ -1,0 +1,62 @@
+services:
+  app-sql:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: inventory-app-sql
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "YourStrongP@ssw0rd1"
+    ports:
+      - "14333:1433"
+
+  sb-emulator-sql:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: sb-emulator-sql
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "YourStrongP@ssw0rd1"
+
+  servicebus-emulator:
+    image: mcr.microsoft.com/azure-messaging/servicebus-emulator:latest
+    container_name: servicebus-emulator
+    depends_on:
+      - sb-emulator-sql
+    environment:
+      SQL_SERVER: sb-emulator-sql
+      MSSQL_SA_PASSWORD: "YourStrongP@ssw0rd1"
+      ACCEPT_EULA: "Y"
+      EMULATOR_HTTP_PORT: "5300"
+    ports:
+      - "5672:5672"
+      - "5300:5300"
+    volumes:
+      - ./local-infra/servicebus-emulator/config.json:/ServiceBus_Emulator/ConfigFiles/Config.json
+
+  api:
+    build:
+      context: .
+      dockerfile: InventoryReorderPlatform.Api/Dockerfile
+    container_name: inventory-api
+    depends_on:
+      - app-sql
+      - servicebus-emulator
+    environment:
+      ASPNETCORE_ENVIRONMENT: "Development"
+      ASPNETCORE_URLS: "http://+:8080"
+      ConnectionStrings__inventorydb: "Server=app-sql,1433;Database=InventoryReorderPlatformDb;User Id=sa;Password=YourStrongP@ssw0rd1;TrustServerCertificate=True;Encrypt=False"
+      ServiceBus__ConnectionString: "Endpoint=sb://servicebus-emulator;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true;"
+      ServiceBus__QueueName: "reorder-events"
+    ports:
+      - "8080:8080"
+
+  processor:
+    build:
+      context: .
+      dockerfile: InventoryReorderPlatform.Processor/Dockerfile
+    container_name: inventory-processor
+    depends_on:
+      - app-sql
+      - servicebus-emulator
+    environment:
+      ConnectionStrings__inventorydb: "Server=app-sql,1433;Database=InventoryReorderPlatformDb;User Id=sa;Password=YourStrongP@ssw0rd1;TrustServerCertificate=True;Encrypt=False"
+      ServiceBus__ConnectionString: "Endpoint=sb://servicebus-emulator;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true;"
+      ServiceBus__QueueName: "reorder-events"
