@@ -1,33 +1,79 @@
 # Aspire HostAddress
-@InventoryReorderPlatform.Api_HostAddress = https://localhost:7025
+# @InventoryReorderPlatform.Api_HostAddress = https://localhost:7025
 
 # Docker HostAddress
-# @InventoryReorderPlatform.Api_HostAddress = http://localhost:8080
+@InventoryReorderPlatform.Api_HostAddress = http://localhost:8080
 
 ###
-# After running the first two POSTs, replace these with the real IDs returned
-@activeItemId = 1
-@lowStockItemId = 2
+# Expected ItemIds
+@firstItemId = 1
+@secondItemId = 2
 
 ###
-# 1) Create item ABOVE threshold -> should become Active
+# Get all inventory items
+GET {{InventoryReorderPlatform.Api_HostAddress}}/api/inventoryitems
+Accept: application/json
+
+###
+# Get the active item by id
+GET {{InventoryReorderPlatform.Api_HostAddress}}/api/inventoryitems/{{firstItemId}}
+Accept: application/json
+
+###
+# Get all reorder events
+GET {{InventoryReorderPlatform.Api_HostAddress}}/api/reorderevents
+Accept: application/json
+
+###
+# Create item ABOVE threshold -> should become Active, no reorder event needed
 POST {{InventoryReorderPlatform.Api_HostAddress}}/api/inventoryitems
 Content-Type: application/json
 
 {
-  "name": "Wireless Mouse",
-  "sku": "MOUSE-1001",
+  "name": "Mechanical Keyboard",
+  "sku": "KEY-1001",
   "quantityOnHand": 20,
   "reorderThreshold": 5
 }
 
 ###
-# 2) Get all inventory items
-GET {{InventoryReorderPlatform.Api_HostAddress}}/api/inventoryitems
-Accept: application/json
+# Update the first item so it crosses into ReorderPending, creating reorder event
+PUT {{InventoryReorderPlatform.Api_HostAddress}}/api/inventoryitems/{{firstItemId}}
+Content-Type: application/json
+
+{
+  "name": "Mechanical Keyboard",
+  "sku": "KEY-1001",
+  "quantityOnHand": 4,
+  "reorderThreshold": 5
+}
 
 ###
-# 3) Create item AT OR BELOW threshold -> should become ReorderPending
+# Update the first item lower, without creating duplicate reorder event
+PUT {{InventoryReorderPlatform.Api_HostAddress}}/api/inventoryitems/{{firstItemId}}
+Content-Type: application/json
+
+{
+  "name": "Mechanical Keyboard",
+  "sku": "KEY-1001",
+  "quantityOnHand": 2,
+  "reorderThreshold": 5
+}
+
+###
+# Recover the first item above threshold -> should go back to Active
+PUT {{InventoryReorderPlatform.Api_HostAddress}}/api/inventoryitems/{{firstItemId}}
+Content-Type: application/json
+
+{
+  "name": "Mechanical Keyboard",
+  "sku": "KEY-1001",
+  "quantityOnHand": 12,
+  "reorderThreshold": 5
+}
+
+###
+# Create item BELOW threshold -> should become ReorderPending, creating reorder event
 POST {{InventoryReorderPlatform.Api_HostAddress}}/api/inventoryitems
 Content-Type: application/json
 
@@ -37,75 +83,3 @@ Content-Type: application/json
   "quantityOnHand": 3,
   "reorderThreshold": 5
 }
-
-###
-# 4) Get all reorder events
-GET {{InventoryReorderPlatform.Api_HostAddress}}/api/reorderevents
-Accept: application/json
-
-###
-# 5) Get the active item by id before updating it downward
-GET {{InventoryReorderPlatform.Api_HostAddress}}/api/inventoryitems/{{activeItemId}}
-Accept: application/json
-
-###
-# 6) Update the active item so it crosses into ReorderPending
-PUT {{InventoryReorderPlatform.Api_HostAddress}}/api/inventoryitems/{{activeItemId}}
-Content-Type: application/json
-
-{
-  "name": "Wireless Mouse",
-  "sku": "MOUSE-1001",
-  "quantityOnHand": 4,
-  "reorderThreshold": 5
-}
-
-###
-# 7) Get that item again after the downward update
-GET {{InventoryReorderPlatform.Api_HostAddress}}/api/inventoryitems/{{activeItemId}}
-Accept: application/json
-
-###
-# 8) Get all reorder events again
-GET {{InventoryReorderPlatform.Api_HostAddress}}/api/reorderevents
-Accept: application/json
-
-###
-# 9) Update the same low-stock item again, but keep it low
-# This should NOT create a duplicate reorder event
-PUT {{InventoryReorderPlatform.Api_HostAddress}}/api/inventoryitems/{{activeItemId}}
-Content-Type: application/json
-
-{
-  "name": "Wireless Mouse",
-  "sku": "MOUSE-1001",
-  "quantityOnHand": 2,
-  "reorderThreshold": 5
-}
-
-###
-# 10) Get all reorder events again
-GET {{InventoryReorderPlatform.Api_HostAddress}}/api/reorderevents
-Accept: application/json
-
-###
-# 11) Recover the item above threshold -> should go back to Active
-PUT {{InventoryReorderPlatform.Api_HostAddress}}/api/inventoryitems/{{activeItemId}}
-Content-Type: application/json
-
-{
-  "name": "Wireless Mouse",
-  "sku": "MOUSE-1001",
-  "quantityOnHand": 12,
-  "reorderThreshold": 5
-}
-
-###
-# 12) Get the recovered item by id
-GET {{InventoryReorderPlatform.Api_HostAddress}}/api/inventoryitems/{{activeItemId}}
-Accept: application/json
-
-###
-# 13) Final reorder event check
-GET {{InventoryReorderPlatform.Api_HostAddress}}/api/reorderevents
-Accept: application/json

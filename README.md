@@ -4,41 +4,38 @@ A .NET portfolio project focused on event-driven workflow, background processing
 
 ## Purpose
 
-This project is being built to strengthen the portfolio for traditional remote software job applications by covering .NET ecosystem skills that are not shown as clearly in the earlier projects.
+This project was built to strengthen my backend portfolio with a .NET solution that goes beyond basic CRUD and server-rendered business forms.
 
-The goal is to demonstrate practical experience with:
-- ASP.NET Core
-- Web API development
-- background processing with a worker service
+The goal was to demonstrate practical experience with:
+- ASP.NET Core Web API development
+- background processing with a Worker Service
 - event-driven workflow design
-- Entity Framework Core
-- SQL Server
-- distributed application structure
-- containerized local development
-- cloud-compatible messaging architecture
-- zero-cost local infrastructure emulation for development and testing
+- Entity Framework Core and SQL Server
+- distributed application structure with .NET Aspire
+- containerized local development with Docker
+- Azure-compatible messaging concepts using the Azure Service Bus Emulator
+- zero-cost local infrastructure for development and testing
 
 ## Project Concept
 
-The application models a small internal inventory platform.
+The application models a lightweight internal inventory platform.
 
-Inventory items have stock levels and reorder thresholds. When stock falls below the configured threshold, the system creates reorder-related records and publishes a reorder message. A separate processor service consumes that message and marks the reorder event as processed.
+Inventory items have stock levels and reorder thresholds. When stock falls below the configured threshold, the system creates a reorder event and publishes a reorder message. A separate processor service consumes that message and marks the reorder event as processed.
 
-The project is intentionally scoped like a lightweight internal business platform rather than a polished product.
+The project is intentionally scoped like a small internal business platform rather than a polished product or commercial SaaS application.
 
-## What This Project Should Demonstrate
+## What This Project Demonstrates
 
-This project is meant to show that I can build more than standard CRUD or server-rendered business forms.
+This project is intended to show that I can build more than simple request/response CRUD applications.
 
-It is intended to support roles involving:
-- C# / .NET backend development
-- ASP.NET Core application development
-- Web API development
-- background processing and worker services
-- event-driven workflow thinking
-- SQL-backed internal business systems
-- container-based development
-- cloud-ready distributed application design
+It demonstrates:
+- API-first backend design
+- background worker processing
+- message-driven workflow
+- shared data and contracts across projects
+- SQL-backed business state
+- container-aware local development
+- cloud-ready architectural thinking without requiring paid cloud deployment
 
 ## Tech Stack
 
@@ -51,106 +48,85 @@ It is intended to support roles involving:
 - Docker
 - Docker Compose
 - Azure Service Bus client libraries
-- Azure Service Bus Emulator for local development/testing
+- Azure Service Bus Emulator
 
-## Architecture
+## Solution Structure
 
-The solution is structured as a small multi-project distributed application.
+The solution is organized as a small multi-project distributed application.
 
-Projects:
-- `InventoryReorderPlatform.AppHost`
-- `InventoryReorderPlatform.ServiceDefaults`
-- `InventoryReorderPlatform.Api`
-- `InventoryReorderPlatform.Processor`
-- `InventoryReorderPlatform.Data`
-- `InventoryReorderPlatform.Contracts`
+### `InventoryReorderPlatform.AppHost`
+Orchestrates the distributed application locally during development with Aspire.
 
-### AppHost
-Orchestrates the distributed application locally during development.
+### `InventoryReorderPlatform.ServiceDefaults`
+Holds shared service defaults for the distributed application.
 
-### Api
-Provides the main application surface for inventory item management, reorder visibility, and administrative workflows.
+### `InventoryReorderPlatform.Api`
+Provides the main application surface for inventory item management and reorder visibility.
 
-### Processor
-Runs background logic for reorder message consumption and reorder-event processing.
+### `InventoryReorderPlatform.Processor`
+Consumes reorder messages and updates reorder-event processing state.
 
-### Data
-Holds the shared EF Core data layer used by both the API and the Processor, including:
+### `InventoryReorderPlatform.Data`
+Holds the shared EF Core data layer, including:
 - entity models
 - `AppDbContext`
 
-### Contracts
+### `InventoryReorderPlatform.Contracts`
 Holds shared cross-project contracts, including:
 - messaging contracts
 - shared configuration classes
 
 ## Current Features
 
-Implemented so far:
-- distributed .NET solution structure using Aspire
-- shared data layer used by both the API and Processor
-- shared contracts layer for messaging/configuration
+- Distributed .NET solution structure using Aspire
+- Shared EF Core data layer used by both API and Processor
+- Shared contracts layer for messaging and configuration
 - SQL-backed persistence with Entity Framework Core
-- initial relational data model for:
+- Relational data model for:
   - inventory items
   - reorder events
   - reorder history
-- `AppDbContext` created and shared across projects
-- inventory API endpoints for:
+- Inventory API endpoints for:
   - get all inventory items
   - get inventory item by id
   - create inventory item
   - update inventory item
-- reorder event API endpoint for:
+- Reorder event API endpoint for:
   - get all reorder events
-- DTO-based request/response flow for the inventory API
-- automatic inventory status calculation based on quantity on hand and reorder threshold
-- automatic transition to:
+- DTO-based request and response flow for the API
+- Automatic inventory status calculation based on quantity on hand and reorder threshold
+- Automatic status transitions to:
   - `Active`
   - `ReorderPending`
-- automatic reorder event creation when an item transitions into `ReorderPending`
-- automatic reorder history creation when an item status changes
-- duplicate reorder event avoidance when an item remains in the same low-stock state
-- reorder event processing states:
+- Automatic reorder event creation when an item transitions into `ReorderPending`
+- Automatic reorder history creation when an item status changes
+- Duplicate reorder event avoidance when an item remains in the same low-stock state
+- Reorder event processing states:
   - `Pending`
   - `Processed`
-- queue-based reorder message publishing from the API
-- queue-based reorder message consumption in the Processor
-- background processor that:
-  - consumes reorder messages from the Service Bus emulator
-  - marks matching reorder events as processed
-  - logs processing activity
-- end-to-end producer/consumer workflow running locally:
-  - API creates pending reorder events
-  - API publishes reorder messages
-  - Processor consumes reorder messages
-  - Processor marks reorder events as processed
-- container-friendly SQL Server development path through Aspire-managed infrastructure
-- Docker support added for:
-  - `InventoryReorderPlatform.Api`
-  - `InventoryReorderPlatform.Processor`
-- zero-cost Azure-compatible messaging development using the official Azure Service Bus Emulator
-- root-level Docker Compose local stack for:
-  - API
-  - Processor
+- Queue-based reorder message publishing from the API
+- Queue-based reorder message consumption in the Processor
+- End-to-end producer/consumer workflow running locally
+- Container-friendly SQL Server development path through Aspire-managed infrastructure
+- Docker support for the API and Processor
+- Root-level Docker Compose local stack for:
   - application SQL Server
   - Service Bus emulator
   - Service Bus emulator SQL dependency
-- containerized local run path validated end-to-end
-- Aspire run path still working alongside the Docker Compose local stack
+  - API
+  - Processor
+- Zero-cost Azure-compatible messaging development using the official Azure Service Bus Emulator
 
 ## Core Workflow
 
-The current workflow is:
-
-1. inventory items are created and tracked
-2. each item has a quantity on hand and a reorder threshold
-3. when stock falls below threshold, the item transitions to `ReorderPending`
-4. a reorder event is created with `Status = "Pending"`
-5. the API publishes a `ReorderRequestedMessage`
-6. the Processor consumes that message from the queue
-7. the Processor marks the matching reorder event as `Processed`
-8. reorder activity and status changes remain recorded in history
+1. Inventory items are created and tracked.
+2. Each item has a quantity on hand and a reorder threshold.
+3. When stock falls below threshold, the item transitions to `ReorderPending`.
+4. A reorder event is created with `Status = "Pending"`.
+5. The API publishes a `ReorderRequestedMessage`.
+6. The Processor consumes that message from the queue.
+7. The Processor marks the matching reorder event as `Processed`.
+8. Reorder activity and status changes remain recorded in history.
 
 ## Data Model
 
@@ -178,17 +154,28 @@ The current workflow is:
 - `NewStatus`
 - `ChangedAt`
 
+## Screenshots
+
+![Docker local stack running](docs/images/docker-local-stack.png)
+![Inventory items endpoint](docs/images/inventory-items-endpoint.png)
+![Reorder events showing processed workflow](docs/images/reorder-events-processed.png)
+![Processor logs showing queue workflow](docs/images/processor-logs.png)
+
 ## Running the Project Locally
 
-### Aspire mode
+This project supports two local run modes.
+
+### Aspire Mode
+
 Best for normal development and debugging.
 
-- run the AppHost project from Visual Studio
-- this starts the distributed app locally through Aspire orchestration
-- for reorder-message publishing/consumption tests, make sure the Service Bus emulator is running
+- Run the `InventoryReorderPlatform.AppHost` project from Visual Studio.
+- This starts the distributed app locally through Aspire orchestration.
+- For reorder-message publishing and consumption tests, make sure the Service Bus emulator is running.
 
-### Docker / local stack mode
-Best for demonstrating the local containerized distributed system.
+### Docker / Local Stack Mode
+
+Best for demonstrating the full local containerized distributed system.
 
 From the repository root, run:
 
@@ -205,7 +192,7 @@ The local stack includes:
 - API
 - Processor
 
-The API is exposed locally on:
+The API is exposed locally at:
 
 `http://localhost:8080`
 
@@ -214,8 +201,13 @@ Useful commands:
 ```bash
 docker compose -f docker-compose.local.yml logs -f api
 docker compose -f docker-compose.local.yml logs -f processor
+docker compose -f docker-compose.local.yml logs servicebus-emulator
 docker compose -f docker-compose.local.yml down
 ```
+
+### Important startup note
+
+After starting the Docker local stack, wait until the Service Bus emulator logs show that it is fully up before sending the first POST or PUT request that publishes a reorder message.
 
 ## Implementation Notes
 
@@ -230,15 +222,21 @@ docker compose -f docker-compose.local.yml down
   - inventory item status = `Active` / `ReorderPending`
 - Reorder events are created only when an item transitions into `ReorderPending`, which avoids duplicate event creation on repeated low-stock updates.
 - Reorder history entries are created whenever item status changes.
-- The Processor now uses queue-based message consumption as the primary reorder-processing workflow.
+- The Processor uses queue-based message consumption as the primary reorder-processing workflow.
 - The normal development runtime path is container-friendly rather than LocalDB-dependent.
-- Docker support has been added to the API and Processor projects.
 - Messaging is implemented and tested locally against the official Azure Service Bus Emulator to keep the project zero-cost while staying Azure-compatible.
-- The project is cloud-ready in structure, but the published version is intentionally local/emulator-based rather than deployed to paid Azure resources.
+- The published version is intentionally local and emulator-based rather than deployed to paid Azure resources.
 
-## Scope Rules
+## Local Reset
 
-This project should stay compact, employer-facing, and meaningfully different from the earlier support/request-style portfolio work.
+If I need a clean local restart during development, the simplest reset path is to tear down the Docker local stack and bring it back up fresh.
+
+```bash
+docker compose -f docker-compose.local.yml down -v
+docker compose -f docker-compose.local.yml up -d --build
+```
+
+## Scope
 
 ### In scope
 - inventory tracking workflow
@@ -260,7 +258,7 @@ This project should stay compact, employer-facing, and meaningfully different fr
 
 ## Why This Project Exists
 
-The earlier portfolio projects already demonstrate:
+My earlier portfolio projects already demonstrate:
 - API development
 - MVC server-rendered workflow
 - validation-aware form handling
@@ -275,23 +273,18 @@ This project exists to add proof of:
 - cloud-compatible architecture
 - a different business domain from tickets, service requests, or support portals
 
-## Current Status
+## Final Positioning
 
-Implementation in progress.
+This project is best described as:
 
-Completed so far:
-- project direction finalized
-- distributed solution structure created
-- Aspire-based application skeleton created
-- API, Processor, shared Data, and shared Contracts projects added to the solution
-- initial domain models created
-- EF Core data layer created and shared across projects
-- inventory API workflow implemented and smoke-tested
-- reorder status logic added to create and update workflows
-- automatic reorder event and reorder history generation implemented and tested
-- reorder event inspection endpoint implemented
-- Processor connected to the shared database
-- Docker support added to API and Processor
-- official Azure Service Bus Emulator integrated for zero-cost local queue development
-- queue-based publish/consume workflow implemented and tested end-to-end
-- Docker Compose local stack implemented and validated
+- a distributed .NET backend portfolio project
+- with an API producer and a background consumer
+- backed by SQL Server
+- using queue-based reorder processing
+- containerized for local execution
+- Azure-compatible in architecture
+- implemented and tested locally at zero cost using the official Azure Service Bus Emulator
+
+## License
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.

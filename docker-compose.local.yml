@@ -1,25 +1,45 @@
 services:
   app-sql:
     image: mcr.microsoft.com/mssql/server:2022-latest
-    container_name: inventory-app-sql
     environment:
       ACCEPT_EULA: "Y"
       MSSQL_SA_PASSWORD: "YourStrongP@ssw0rd1"
     ports:
       - "14333:1433"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -C -Q \"SELECT 1\" || exit 1"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 20s
+    restart: unless-stopped
 
   sb-emulator-sql:
     image: mcr.microsoft.com/mssql/server:2022-latest
-    container_name: sb-emulator-sql
     environment:
       ACCEPT_EULA: "Y"
       MSSQL_SA_PASSWORD: "YourStrongP@ssw0rd1"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -C -Q \"SELECT 1\" || exit 1"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+    restart: unless-stopped
 
   servicebus-emulator:
     image: mcr.microsoft.com/azure-messaging/servicebus-emulator:latest
-    container_name: servicebus-emulator
     depends_on:
-      - sb-emulator-sql
+      sb-emulator-sql:
+        condition: service_healthy
     environment:
       SQL_SERVER: sb-emulator-sql
       MSSQL_SA_PASSWORD: "YourStrongP@ssw0rd1"
@@ -30,15 +50,17 @@ services:
       - "5300:5300"
     volumes:
       - ./local-infra/servicebus-emulator/config.json:/ServiceBus_Emulator/ConfigFiles/Config.json
+    restart: unless-stopped
 
   api:
     build:
       context: .
       dockerfile: InventoryReorderPlatform.Api/Dockerfile
-    container_name: inventory-api
     depends_on:
-      - app-sql
-      - servicebus-emulator
+      app-sql:
+        condition: service_healthy
+      servicebus-emulator:
+        condition: service_started
     environment:
       ASPNETCORE_ENVIRONMENT: "Development"
       ASPNETCORE_URLS: "http://+:8080"
@@ -47,16 +69,19 @@ services:
       ServiceBus__QueueName: "reorder-events"
     ports:
       - "8080:8080"
+    restart: unless-stopped
 
   processor:
     build:
       context: .
       dockerfile: InventoryReorderPlatform.Processor/Dockerfile
-    container_name: inventory-processor
     depends_on:
-      - app-sql
-      - servicebus-emulator
+      app-sql:
+        condition: service_healthy
+      servicebus-emulator:
+        condition: service_started
     environment:
       ConnectionStrings__inventorydb: "Server=app-sql,1433;Database=InventoryReorderPlatformDb;User Id=sa;Password=YourStrongP@ssw0rd1;TrustServerCertificate=True;Encrypt=False"
       ServiceBus__ConnectionString: "Endpoint=sb://servicebus-emulator;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true;"
       ServiceBus__QueueName: "reorder-events"
+    restart: unless-stopped
