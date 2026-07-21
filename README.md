@@ -117,6 +117,36 @@ Holds shared cross-project contracts, including:
   - Processor
 - Zero-cost Azure-compatible messaging development using the official Azure Service Bus Emulator
 
+## Expansion
+
+This repository is being expanded through a second portfolio phase: **Inventory Operations and Reliability Expansion**.
+
+The expansion focuses on production-readiness concerns around operator visibility, role-based authorization, reliable message processing, observability, and operational documentation.
+
+Planned additions include a React/TypeScript operations dashboard, idempotent message-processing safeguards, authorization/audit workflows, structured logging, health/readiness checks, and production-oriented tests.
+
+See:
+
+- `docs/project-10-inventory-operations-roadmap.md`
+- `docs/inventory-operations-case-study.md`
+
+Implemented for the Inventory Operations and Reliability Expansion so far:
+
+- expansion roadmap
+- operational case-study document
+- React/TypeScript dashboard scaffold
+
+### Running the Operations Dashboard
+
+From the `client` folder:
+
+```bash
+npm install
+npm run dev
+```
+
+The dashboard is currently an initial React/TypeScript scaffold for the Inventory Operations and Reliability Expansion.
+
 ## Core Workflow
 
 1. Inventory items are created and tracked.
