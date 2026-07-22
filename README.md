@@ -135,6 +135,20 @@ Implemented for the Inventory Operations and Reliability Expansion so far:
 - expansion roadmap
 - operational case-study document
 - React/TypeScript dashboard scaffold
+- inventory dashboard list view
+- low-stock frontend filtering
+- inventory summary cards
+
+Planned next:
+
+- reorder workflow status view
+- processing history view
+- system health view
+- role-based authorization
+- audit trail
+- idempotent message-processing safeguards
+- observability improvements
+- reliability-focused tests
 
 ### Running the Operations Dashboard
 
