@@ -52,6 +52,21 @@ services:
       - ./local-infra/servicebus-emulator/config.json:/ServiceBus_Emulator/ConfigFiles/Config.json
     restart: unless-stopped
 
+  servicebus-ready:
+    image: curlimages/curl:latest
+    depends_on:
+      servicebus-emulator:
+        condition: service_started
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        until curl --fail --silent --show-error http://servicebus-emulator:5300/health; do
+          echo "Waiting for Service Bus emulator..."
+          sleep 2
+        done
+        echo "Service Bus emulator is ready."
+    restart: "no"
+
   api:
     build:
       context: .
@@ -59,8 +74,8 @@ services:
     depends_on:
       app-sql:
         condition: service_healthy
-      servicebus-emulator:
-        condition: service_started
+      servicebus-ready:
+        condition: service_completed_successfully
     environment:
       ASPNETCORE_ENVIRONMENT: "Development"
       ASPNETCORE_URLS: "http://+:8080"
@@ -78,8 +93,8 @@ services:
     depends_on:
       app-sql:
         condition: service_healthy
-      servicebus-emulator:
-        condition: service_started
+      servicebus-ready:
+        condition: service_completed_successfully
     environment:
       ConnectionStrings__inventorydb: "Server=app-sql,1433;Database=InventoryReorderPlatformDb;User Id=sa;Password=YourStrongP@ssw0rd1;TrustServerCertificate=True;Encrypt=False"
       ServiceBus__ConnectionString: "Endpoint=sb://servicebus-emulator;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true;"
