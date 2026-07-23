@@ -5,9 +5,13 @@ import { listInventoryItems } from './api/inventoryItems'
 import { InventorySummaryCards } from './components/InventorySummaryCards'
 import { InventoryTable } from './components/InventoryTable'
 import { isLowStock, type InventoryItem } from './types/inventoryItem'
+import { listReorderEvents } from './api/reorderEvents'
+import { ReorderWorkflowPanel } from './components/ReorderWorkflowPanel'
+import type { ReorderEvent } from './types/reorderEvent'
 
 function App() {
   const [items, setItems] = useState<InventoryItem[]>([])
+  const [reorderEvents, setReorderEvents] = useState<ReorderEvent[]>([])
   const [showLowStockOnly, setShowLowStockOnly] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
@@ -21,25 +25,30 @@ function App() {
   }, [items, showLowStockOnly])
 
   useEffect(() => {
-    async function loadItems() {
+    async function loadDashboardData() {
       setIsLoading(true)
       setErrorMessage('')
 
       try {
-        const loadedItems = await listInventoryItems()
+        const [loadedItems, loadedReorderEvents] = await Promise.all([
+          listInventoryItems(),
+          listReorderEvents(),
+        ])
+
         setItems(loadedItems)
+        setReorderEvents(loadedReorderEvents)
       } catch (error) {
         setErrorMessage(
           error instanceof Error
             ? error.message
-            : 'Unable to load inventory items.',
+            : 'Unable to load dashboard data.',
         )
       } finally {
         setIsLoading(false)
       }
     }
 
-    loadItems()
+    loadDashboardData()
   }, [])
 
   return (
@@ -54,7 +63,7 @@ function App() {
       </header>
 
       {errorMessage && <p className="error">{errorMessage}</p>}
-      {isLoading && <p>Loading inventory...</p>}
+      {isLoading && <p>Loading dashboard...</p>}
 
       <InventorySummaryCards items={items} />
 
@@ -72,10 +81,10 @@ function App() {
       <InventoryTable items={visibleItems} />
 
       <section className="grid">
-        <article className="card">
-          <h2>Reorder Workflow</h2>
-          <p>Reorder status and processing history will be displayed here.</p>
-        </article>
+        <ReorderWorkflowPanel
+          events={reorderEvents}
+          inventoryItems={items}
+        />
 
         <article className="card">
           <h2>System Health</h2>

@@ -137,6 +137,16 @@ th {
   color: #92400e;
 }
 
+.badge.neutral {
+  background: #e0f2fe;
+  color: #075985;
+}
+
+.badge.error-badge {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
 .error {
   background: #fee2e2;
   color: #991b1b;

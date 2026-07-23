@@ -153,10 +153,10 @@ Implemented for the Inventory Operations and Reliability Expansion so far:
 - inventory dashboard list view
 - low-stock frontend filtering
 - inventory summary cards
+- reorder workflow dashboard view
 
 Planned next:
 
-- reorder workflow status view
 - processing history view
 - system health view
 - role-based authorization
