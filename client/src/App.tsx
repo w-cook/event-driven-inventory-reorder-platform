@@ -8,6 +8,7 @@ import { isLowStock, type InventoryItem } from './types/inventoryItem'
 import { listReorderEvents } from './api/reorderEvents'
 import { ReorderWorkflowPanel } from './components/ReorderWorkflowPanel'
 import type { ReorderEvent } from './types/reorderEvent'
+import { WorkflowSummaryCards } from './components/WorkflowSummaryCards'
 
 function App() {
   const [items, setItems] = useState<InventoryItem[]>([])
@@ -54,7 +55,6 @@ function App() {
   return (
     <main className="page">
       <header className="hero">
-        <p className="eyebrow">Project 10 Expansion</p>
         <h1>Inventory Operations Dashboard</h1>
         <p>
           Operator-facing dashboard for inventory visibility, low-stock review,
@@ -66,6 +66,8 @@ function App() {
       {isLoading && <p>Loading dashboard...</p>}
 
       <InventorySummaryCards items={items} />
+
+      <WorkflowSummaryCards events={reorderEvents} />
 
       <section className="toolbar">
         <label>
