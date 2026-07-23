@@ -304,6 +304,7 @@ The local stack includes:
 - application SQL Server
 - Service Bus emulator
 - Service Bus emulator SQL dependency
+- Service Bus emulator readiness gating so the API and Processor start only after the emulator is ready
 - API
 - Processor
 
@@ -320,9 +321,11 @@ docker compose -f docker-compose.local.yml logs servicebus-emulator
 docker compose -f docker-compose.local.yml down
 ```
 
-### Important startup note
+### Service Bus startup readiness
 
-After starting either local run mode, wait until the Service Bus Emulator logs show that it has completed startup before sending the first POST or PUT request that publishes a reorder message.
+The Docker Compose stack includes a one-shot readiness check for the Service Bus Emulator. The API and Processor do not start until the emulator’s health endpoint reports that it is ready to accept connections.
+
+This prevents an initial low-stock request from creating a pending reorder event while failing to publish its corresponding Service Bus message during emulator startup.
 
 ## Implementation Notes
 
