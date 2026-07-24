@@ -1,14 +1,17 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import './App.css'
 
 import { listInventoryItems } from './api/inventoryItems'
+import { listReorderEvents } from './api/reorderEvents'
+import { getSystemHealth } from './api/systemHealth'
 import { InventorySummaryCards } from './components/InventorySummaryCards'
 import { InventoryTable } from './components/InventoryTable'
-import { isLowStock, type InventoryItem } from './types/inventoryItem'
-import { listReorderEvents } from './api/reorderEvents'
 import { ReorderWorkflowPanel } from './components/ReorderWorkflowPanel'
-import type { ReorderEvent } from './types/reorderEvent'
+import { SystemHealthPanel } from './components/SystemHealthPanel'
 import { WorkflowSummaryCards } from './components/WorkflowSummaryCards'
+import { isLowStock, type InventoryItem } from './types/inventoryItem'
+import type { ReorderEvent } from './types/reorderEvent'
+import type { SystemHealth } from './types/systemHealth'
 
 function App() {
   const [items, setItems] = useState<InventoryItem[]>([])
@@ -17,6 +20,10 @@ function App() {
   const [isLoading, setIsLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
 
+  const [systemHealth, setSystemHealth] = useState<SystemHealth | null>(null)
+  const [isHealthLoading, setIsHealthLoading] = useState(false)
+  const [healthErrorMessage, setHealthErrorMessage] = useState('')
+
   const visibleItems = useMemo(() => {
     if (!showLowStockOnly) {
       return items
@@ -24,6 +31,24 @@ function App() {
 
     return items.filter(isLowStock)
   }, [items, showLowStockOnly])
+
+  const loadSystemHealth = useCallback(async () => {
+    setIsHealthLoading(true)
+    setHealthErrorMessage('')
+
+    try {
+      const health = await getSystemHealth()
+      setSystemHealth(health)
+    } catch (error) {
+      setHealthErrorMessage(
+        error instanceof Error
+          ? error.message
+          : 'Unable to load system health.',
+      )
+    } finally {
+      setIsHealthLoading(false)
+    }
+  }, [])
 
   useEffect(() => {
     async function loadDashboardData() {
@@ -49,8 +74,9 @@ function App() {
       }
     }
 
-    loadDashboardData()
-  }, [])
+    void loadDashboardData()
+    void loadSystemHealth()
+  }, [loadSystemHealth])
 
   return (
     <main className="page">
@@ -88,10 +114,12 @@ function App() {
           inventoryItems={items}
         />
 
-        <article className="card">
-          <h2>System Health</h2>
-          <p>API, processor, queue, and database health will be summarized here.</p>
-        </article>
+        <SystemHealthPanel
+          health={systemHealth}
+          isLoading={isHealthLoading}
+          errorMessage={healthErrorMessage}
+          onRefresh={loadSystemHealth}
+        />
       </section>
     </main>
   )

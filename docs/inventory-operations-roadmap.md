@@ -26,47 +26,47 @@ This expansion focuses on production-readiness concerns that commonly appear in 
 
 ### Phase 1 — Operations Dashboard Foundation
 
-- React/TypeScript dashboard scaffold
-- inventory item list
-- low-stock filtering
-- reorder status visibility
-- processing history view
-- system health/status view
+- [x] React/TypeScript dashboard scaffold
+- [x] inventory item list
+- [x] low-stock filtering
+- [x] reorder status visibility
+- [x] processing history view
+- [x] system health/status view
 
 ### Phase 2 — Authorization and Audit Trail
 
-- role-based access model
-- Viewer role for read-only access
-- Operator role for quantity updates and workflow actions
-- Administrator role for user/configuration management if scope allows
-- audit records for important user actions
+- [ ] role-based access model
+- [ ] Viewer role for read-only access
+- [ ] Operator role for quantity updates and workflow actions
+- [ ] Administrator role for user/configuration management if scope allows
+- [ ] audit records for important user actions
 
 ### Phase 3 — Reliable Message Processing
 
-- idempotent message consumption
-- duplicate-message protection
-- retry behavior for processor failures
-- failed-processing or poison-message handling
-- tests proving duplicate delivery does not create duplicate business results
+- [ ] idempotent message consumption
+- [ ] duplicate-message protection
+- [ ] retry behavior for processor failures
+- [ ] failed-processing or poison-message handling
+- [ ] tests proving duplicate delivery does not create duplicate business results
 
 ### Phase 4 — Observability
 
-- structured logging
-- correlation identifiers across API and processor
-- health/readiness endpoints
-- OpenTelemetry traces where practical
-- documented examples for debugging a reorder workflow
+- [ ] structured logging
+- [ ] correlation identifiers across API and processor
+- [x] health/readiness endpoints
+- [ ] OpenTelemetry traces where practical
+- [ ] documented examples for debugging a reorder workflow
 
 ### Phase 5 — Production-Oriented Tests and Documentation
 
-- authorization tests
-- duplicate-message tests
-- processor failure/recovery tests
-- end-to-end workflow test with containerized dependencies where practical
-- architecture diagram
-- failure scenarios
-- reliability decisions and tradeoffs
-- operational runbook
+- [ ] authorization tests
+- [ ] duplicate-message tests
+- [ ] processor failure/recovery tests
+- [ ] end-to-end workflow test with containerized dependencies where practical
+- [ ] architecture diagram
+- [ ] failure scenarios
+- [ ] reliability decisions and tradeoffs
+- [ ] operational runbook
 
 ## Non-Goals
 

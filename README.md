@@ -154,11 +154,15 @@ Implemented for the Inventory Operations and Reliability Expansion so far:
 - low-stock frontend filtering
 - inventory summary cards
 - reorder workflow dashboard view
+- system health API endpoint
+- system health dashboard panel
+- database connectivity status
+- operational inventory and reorder-event counts
+- manual health refresh with loading and failure states
 
 Planned next:
 
 - processing history view
-- system health view
 - role-based authorization
 - audit trail
 - idempotent message-processing safeguards
@@ -176,6 +180,38 @@ npm run dev
 ```
 
 The Vite development server uses the configured `/api` proxy to reach the Docker-hosted ASP.NET Core API. Aspire-mode dashboard support is planned but not yet implemented; the frontend API target will be unified in a later expansion step so the same client configuration can work with both local run modes.
+
+### Operations Health Endpoint
+
+The API provides a read-only operations health endpoint:
+
+```http
+GET /api/operations/health
+```
+
+The response reports:
+
+- API health status
+- application database connectivity
+- current inventory-item count
+- current reorder-event count
+- UTC timestamp for the check
+
+Example response:
+
+```json
+{
+  "status": "Healthy",
+  "databaseStatus": "Connected",
+  "inventoryItemCount": 2,
+  "reorderEventCount": 1,
+  "checkedAt": "2026-07-24T16:30:00Z"
+}
+```
+
+If the database cannot be queried, the endpoint returns `503 Service Unavailable` with unavailable database status and null record counts.
+
+The React operations dashboard displays this information in the System Health panel and supports a manual refresh without reloading the inventory and reorder workflow views.
 
 ## Core Workflow
 
@@ -349,6 +385,10 @@ This prevents an initial low-stock request from creating a pending reorder event
 - The normal development runtime path is container-friendly rather than LocalDB-dependent.
 - Messaging is implemented and tested locally against the official Azure Service Bus Emulator to keep the project zero-cost while staying Azure-compatible.
 - The published version is intentionally local and emulator-based rather than deployed to paid Azure resources.
+- The dashboard-oriented `/api/operations/health` endpoint is separate from the Aspire `/health` and `/alive` endpoints.
+- The operations endpoint performs a real application database connectivity check and queries current inventory and reorder-event counts.
+- Health record counts are nullable so a failed database query is not misrepresented as zero records.
+- The System Health panel has separate loading and error state so a health failure does not prevent inventory and reorder workflow data from remaining visible.
 
 ## Local Reset
 
