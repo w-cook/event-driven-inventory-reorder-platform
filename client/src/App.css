@@ -35,7 +35,7 @@ body {
 }
 
 .hero h1 {
-  margin: 0 0 1rem;
+  margin: 0 0 2rem;
   color: #172033;
 }
 
@@ -158,8 +158,56 @@ th {
   padding: 0.75rem 1rem;
 }
 
+.section-header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.section-header h2,
+.section-header p {
+  margin-bottom: 0;
+}
+
+.health-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.health-grid .stat-value {
+  display: block;
+  margin-top: 0.35rem;
+}
+
+.health-last-checked {
+  grid-column: 1 / -1;
+  text-align: center;
+}
+
+.health-last-checked p {
+  margin-bottom: 0;
+}
+
+.health-description {
+  margin: 0 0 1rem;
+  text-align: center;
+}
+
+.muted {
+  color: #526070;
+}
+
 @media (max-width: 760px) {
-  .summary-grid {
+  .grid,
+  .summary-grid,
+  .health-grid {
     grid-template-columns: 1fr;
+  }
+
+  .section-header {
+    display: grid;
   }
 }

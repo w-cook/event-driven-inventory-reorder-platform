@@ -25,6 +25,11 @@ GET {{InventoryReorderPlatform.Api_HostAddress}}/api/reorderevents
 Accept: application/json
 
 ###
+# Get operations health
+GET {{InventoryReorderPlatform.Api_HostAddress}}/api/operations/health
+Accept: application/json
+
+###
 # Create item ABOVE threshold -> should become Active, no reorder event needed
 POST {{InventoryReorderPlatform.Api_HostAddress}}/api/inventoryitems
 Content-Type: application/json
