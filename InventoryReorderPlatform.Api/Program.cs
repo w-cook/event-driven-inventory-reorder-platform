@@ -16,6 +16,8 @@ builder.AddSqlServerDbContext<AppDbContext>(
 // Add services to the container.
 builder.Services.AddControllers();
 
+builder.Services.AddScoped<IAuditService, AuditService>();
+
 builder.Services
     .AddAuthentication(options =>
     {

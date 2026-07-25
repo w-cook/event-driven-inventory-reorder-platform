@@ -69,6 +69,15 @@ X-Demo-User: viewer
 
 ###
 
+// Administrator confirms the audit trail is initially empty
+// Expected: 200 OK with []
+
+GET {{InventoryReorderPlatform.Api_HostAddress}}/api/audit-records
+Accept: application/json
+X-Demo-User: admin
+
+###
+
 // Viewer checks operations health against the empty database
 //
 // Expected:
@@ -91,6 +100,33 @@ X-Demo-User: viewer
 
 GET {{InventoryReorderPlatform.Api_HostAddress}}/api/operations/health
 Accept: application/json
+
+###
+
+// Viewer cannot inspect audit records
+// Expected: 403 Forbidden
+
+GET {{InventoryReorderPlatform.Api_HostAddress}}/api/audit-records
+Accept: application/json
+X-Demo-User: viewer
+
+###
+
+// Operator cannot inspect audit records
+// Expected: 403 Forbidden
+
+GET {{InventoryReorderPlatform.Api_HostAddress}}/api/audit-records
+Accept: application/json
+X-Demo-User: operator
+
+###
+
+// Administrator can inspect audit records
+// Expected: 200 OK with []
+
+GET {{InventoryReorderPlatform.Api_HostAddress}}/api/audit-records
+Accept: application/json
+X-Demo-User: admin
 
 ###
 
@@ -129,6 +165,15 @@ X-Demo-User: viewer
 
 ###
 
+// Confirm the rejected Viewer request did not create an audit record
+// Expected: 200 OK with []
+
+GET {{InventoryReorderPlatform.Api_HostAddress}}/api/audit-records
+Accept: application/json
+X-Demo-User: admin
+
+###
+
 
 // ==========================================================================
 // 3. CREATE INITIAL INVENTORY DATA AS OPERATOR
@@ -158,6 +203,21 @@ X-Demo-User: operator
 
 ###
 
+// Confirm the active-item creation was audited
+//
+// Expected:
+// - 200 OK
+// - One InventoryItemCreated record
+// - UserName identifies the Operator
+// - EntityId is "1"
+// - ReorderEventCreated is false
+
+GET {{InventoryReorderPlatform.Api_HostAddress}}/api/audit-records
+Accept: application/json
+X-Demo-User: admin
+
+###
+
 // Create item 2 below its reorder threshold
 //
 // Expected:
@@ -182,6 +242,19 @@ X-Demo-User: operator
   "quantityOnHand": 3,
   "reorderThreshold": 5
 }
+
+###
+
+// Confirm the low-stock item creation was audited
+//
+// Expected:
+// - Two total audit records
+// - Newest record is InventoryItemCreated for entity "2"
+// - ReorderEventCreated is true
+
+GET {{InventoryReorderPlatform.Api_HostAddress}}/api/audit-records
+Accept: application/json
+X-Demo-User: admin
 
 ###
 
@@ -323,6 +396,15 @@ X-Demo-User: viewer
 
 ###
 
+// Confirm the rejected Viewer update did not create an audit record
+// Expected: still two total records
+
+GET {{InventoryReorderPlatform.Api_HostAddress}}/api/audit-records
+Accept: application/json
+X-Demo-User: admin
+
+###
+
 
 // ==========================================================================
 // 7. TRIGGER A REORDER WORKFLOW AS OPERATOR
@@ -390,6 +472,24 @@ X-Demo-User: viewer
 
 ###
 
+// Confirm the low-stock transition update was audited
+//
+// Expected:
+// - Three total records
+// - Newest action is InventoryItemUpdated
+// - EntityId is "1"
+// - Previous quantity is 20
+// - Current quantity is 4
+// - Previous status is Active
+// - Current status is ReorderPending
+// - ReorderEventCreated is true
+
+GET {{InventoryReorderPlatform.Api_HostAddress}}/api/audit-records
+Accept: application/json
+X-Demo-User: admin
+
+###
+
 
 // ==========================================================================
 // 8. VERIFY REPEATED LOW-STOCK UPDATES DO NOT CREATE BUSINESS DUPLICATES
@@ -451,6 +551,20 @@ X-Demo-User: viewer
 
 ###
 
+// Confirm the repeated low-stock update was audited
+//
+// Expected:
+// - Four total records
+// - Newest action is InventoryItemUpdated
+// - Current quantity is 2
+// - ReorderEventCreated is false
+
+GET {{InventoryReorderPlatform.Api_HostAddress}}/api/audit-records
+Accept: application/json
+X-Demo-User: admin
+
+###
+
 
 // ==========================================================================
 // 9. RESTOCK ITEM 1 ABOVE ITS THRESHOLD
@@ -500,6 +614,21 @@ X-Demo-User: viewer
 
 ###
 
+// Confirm the restock update was audited
+//
+// Expected:
+// - Five total records
+// - Previous status is ReorderPending
+// - Current status is Active
+// - Current quantity is 12
+// - ReorderEventCreated is false
+
+GET {{InventoryReorderPlatform.Api_HostAddress}}/api/audit-records
+Accept: application/json
+X-Demo-User: admin
+
+###
+
 
 // ==========================================================================
 // 10. VERIFY ADMINISTRATOR ACCESS
@@ -534,6 +663,21 @@ X-Demo-User: admin
   "quantityOnHand": 15,
   "reorderThreshold": 5
 }
+
+###
+
+// Confirm the Administrator update was audited
+//
+// Expected:
+// - Six total records
+// - Newest action is InventoryItemUpdated
+// - UserName identifies the Administrator
+// - Role is Administrator
+// - Current quantity is 15
+
+GET {{InventoryReorderPlatform.Api_HostAddress}}/api/audit-records
+Accept: application/json
+X-Demo-User: admin
 
 ###
 
@@ -631,6 +775,18 @@ X-Demo-User: viewer
 
 ###
 
+// Confirm invalid requests did not create audit records
+//
+// Expected:
+// - Six total audit records
+// - No records corresponding to rejected or invalid requests
+
+GET {{InventoryReorderPlatform.Api_HostAddress}}/api/audit-records
+Accept: application/json
+X-Demo-User: admin
+
+###
+
 
 // ==========================================================================
 // 12. FINAL STATE VERIFICATION
@@ -683,3 +839,5 @@ X-Demo-User: viewer
 GET {{InventoryReorderPlatform.Api_HostAddress}}/api/operations/health
 Accept: application/json
 X-Demo-User: viewer
+
+###
