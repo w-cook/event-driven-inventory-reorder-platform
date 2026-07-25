@@ -1,15 +1,8 @@
 import type { InventoryItem } from '../types/inventoryItem'
-
-async function handleResponse<T>(response: Response): Promise<T> {
-  if (!response.ok) {
-    throw new Error(`Request failed with status ${response.status}`)
-  }
-
-  return response.json() as Promise<T>
-}
+import { apiFetch, handleJsonResponse } from './httpClient'
 
 export async function listInventoryItems(): Promise<InventoryItem[]> {
-  const response = await fetch('/api/inventoryitems')
+  const response = await apiFetch('/api/inventoryitems')
 
-  return handleResponse<InventoryItem[]>(response)
+  return handleJsonResponse<InventoryItem[]>(response)
 }

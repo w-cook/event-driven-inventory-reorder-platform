@@ -12,5 +12,7 @@ namespace InventoryReorderPlatform.Data
         public DbSet<ReorderEvent> ReorderEvents => Set<ReorderEvent>();
 
         public DbSet<ReorderHistory> ReorderHistoryEntries => Set<ReorderHistory>();
+
+        public DbSet<AuditRecord> AuditRecords => Set<AuditRecord>();
     }
 }

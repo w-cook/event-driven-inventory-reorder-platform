@@ -1,6 +1,6 @@
 # Event-Driven Inventory Reorder Platform
 
-A .NET portfolio project focused on event-driven workflow, background processing, relational data modeling, containerized local development, and cloud-ready application architecture.
+A .NET portfolio project focused on event-driven workflow, background processing, relational data modeling, role-aware operations, containerized local development, and cloud-ready application architecture.
 
 ## Purpose
 
@@ -11,6 +11,8 @@ The goal was to demonstrate practical experience with:
 - background processing with a Worker Service
 - event-driven workflow design
 - Entity Framework Core and SQL Server
+- policy-based authorization
+- SQL-backed audit trails
 - distributed application structure with .NET Aspire
 - containerized local development with Docker
 - Azure-compatible messaging concepts using the Azure Service Bus Emulator
@@ -24,7 +26,7 @@ Inventory items have stock levels and reorder thresholds. When stock falls below
 
 A processed reorder event does **not** mean that replacement stock has already arrived. The Processor does not automatically increase `QuantityOnHand`, and the inventory item correctly remains `ReorderPending` while its quantity is still at or below the reorder threshold. A later inventory update can represent receipt of new stock; when the quantity rises above the threshold, the item returns to `Active`.
 
-The project is intentionally scoped like a small internal business platform rather than a polished product or commercial SaaS application. It models the internal reorder-request lifecycle without claiming a real purchasing integration or external vendor fulfillment process.
+The project is intentionally scoped like a small internal business platform rather than a polished product or commercial SaaS application. It models the internal reorder-request lifecycle without claiming a real purchasing integration, production identity provider, or external vendor fulfillment process.
 
 ## What This Project Demonstrates
 
@@ -34,6 +36,9 @@ It demonstrates:
 - API-first backend design
 - background worker processing
 - message-driven workflow
+- role-aware API access
+- policy-based authorization
+- SQL-backed audit records for important user actions
 - separation between inventory state and reorder-event state
 - shared data and contracts across projects
 - SQL-backed business state
@@ -67,7 +72,7 @@ Orchestrates the API, Processor, and application SQL Server locally during devel
 Holds shared service defaults for the distributed application.
 
 ### `InventoryReorderPlatform.Api`
-Provides the main application surface for inventory item management, reorder visibility, and reorder-message publishing.
+Provides the main application surface for inventory management, reorder visibility, system health, demo role-based authorization, audit-record access, and reorder-message publishing.
 
 ### `InventoryReorderPlatform.Processor`
 Consumes reorder messages and updates reorder-event processing state. Processing a message records that the reorder request was handled; it does not automatically replenish inventory.
@@ -76,6 +81,7 @@ Consumes reorder messages and updates reorder-event processing state. Processing
 Holds the shared EF Core data layer, including:
 - entity models
 - `AppDbContext`
+- schema migrations
 
 ### `InventoryReorderPlatform.Contracts`
 Holds shared cross-project contracts, including:
@@ -83,7 +89,7 @@ Holds shared cross-project contracts, including:
 - shared configuration classes
 
 ### `client`
-Contains the React/TypeScript operations dashboard used for inventory visibility, summary metrics, and low-stock filtering.
+Contains the React/TypeScript operations dashboard used for inventory visibility, summary metrics, low-stock filtering, reorder workflow history, and system-health visibility.
 
 ## Current Features
 
@@ -95,6 +101,7 @@ Contains the React/TypeScript operations dashboard used for inventory visibility
   - inventory items
   - reorder events
   - reorder history
+  - audit records
 - Inventory API endpoints for:
   - get all inventory items
   - get inventory item by id
@@ -102,7 +109,22 @@ Contains the React/TypeScript operations dashboard used for inventory visibility
   - update inventory item
 - Reorder event API endpoint for:
   - get all reorder events
+- Operations health endpoint with:
+  - API status
+  - database connectivity status
+  - inventory-item count
+  - reorder-event count
+  - UTC check time
+- Administrator-only audit-record endpoint
 - DTO-based request and response flow for the API
+- Demo role-based authentication and policy authorization
+- Role-aware API access for:
+  - `Viewer` — read-only operational access
+  - `Operator` — inventory creation and updates
+  - `Administrator` — elevated access including audit-record review
+- Shared frontend API client that supplies the dashboard's Operator demo identity
+- SQL-backed audit records for successful inventory creation and updates
+- Audit details containing before-and-after inventory state for updates
 - Automatic inventory status calculation based on quantity on hand and reorder threshold
 - Automatic inventory status transitions to:
   - `Active`
@@ -127,9 +149,14 @@ Contains the React/TypeScript operations dashboard used for inventory visibility
   - Processor
 - React/TypeScript inventory operations dashboard with:
   - inventory list view
-  - summary cards
+  - inventory summary cards
   - low-stock filtering
+  - reorder workflow and processing-history view
+  - workflow summary cards
+  - system-health panel
+  - manual health refresh
   - loading and error states
+  - visible Operator demo-role indicator
 - Zero-cost Azure-compatible messaging development using the official Azure Service Bus Emulator
 
 ## Expansion
@@ -138,7 +165,7 @@ This repository is being expanded through a second portfolio phase: **Inventory 
 
 The expansion focuses on production-readiness concerns around operator visibility, role-based authorization, reliable message processing, observability, and operational documentation.
 
-The expansion now includes an initial React/TypeScript operations dashboard. Planned additions include idempotent message-processing safeguards, authorization and audit workflows, structured logging, health and readiness checks, and production-oriented tests.
+The expansion now includes an operational React/TypeScript dashboard, demo role-based authorization, a SQL-backed audit trail, and a dashboard-oriented system-health endpoint. Planned additions include idempotent message-processing safeguards, processor failure handling, observability improvements, and production-oriented tests.
 
 See:
 
@@ -154,20 +181,27 @@ Implemented for the Inventory Operations and Reliability Expansion so far:
 - low-stock frontend filtering
 - inventory summary cards
 - reorder workflow dashboard view
+- processing-history visibility
+- workflow summary cards
 - system health API endpoint
 - system health dashboard panel
 - database connectivity status
 - operational inventory and reorder-event counts
 - manual health refresh with loading and failure states
+- demo role-based authentication
+- policy-based endpoint authorization
+- Viewer, Operator, and Administrator access levels
+- Operator-authenticated React dashboard requests
+- SQL-backed inventory action audit trail
+- Administrator-only audit-record visibility
 
 Planned next:
 
-- processing history view
-- role-based authorization
-- audit trail
 - idempotent message-processing safeguards
-- observability improvements
+- duplicate-message protection
+- processor retry and poison-message handling
 - reliability-focused tests
+- observability improvements
 - unified frontend API endpoint configuration for Aspire and Docker run modes
 
 ### Running the Operations Dashboard
@@ -179,14 +213,62 @@ npm install
 npm run dev
 ```
 
-The Vite development server uses the configured `/api` proxy to reach the Docker-hosted ASP.NET Core API. Aspire-mode dashboard support is planned but not yet implemented; the frontend API target will be unified in a later expansion step so the same client configuration can work with both local run modes.
+The Vite development server uses the configured `/api` proxy to reach the Docker-hosted ASP.NET Core API. The shared frontend API client supplies the `operator` demo identity for protected requests.
+
+Aspire-mode dashboard support is planned but not yet implemented; the frontend API target will be unified in a later expansion step so the same client configuration can work with both local run modes.
+
+### Demo Authorization Model
+
+The project uses a local demo authentication handler to exercise ASP.NET Core claims, roles, and authorization policies without requiring a paid or externally hosted identity provider.
+
+Requests identify a demo user through the `X-Demo-User` header:
+
+```http
+X-Demo-User: viewer
+```
+
+Supported values are:
+
+| Header value | Role | Access |
+| --- | --- | --- |
+| `viewer` | Viewer | Read inventory, reorder workflow, and system health |
+| `operator` | Operator | Viewer access plus inventory creation and updates |
+| `admin` | Administrator | Operator access plus audit-record review |
+
+The React dashboard currently operates as the demo Operator role through its shared API client.
+
+This mechanism is intentionally limited to local demonstration and portfolio use. It is not presented as a production identity-management implementation.
+
+### Audit Trail Endpoint
+
+The API exposes an Administrator-only audit endpoint:
+
+```http
+GET /api/audit-records
+X-Demo-User: admin
+```
+
+Audit records are returned newest first and include:
+
+- user name
+- role
+- action
+- entity type
+- entity identifier
+- serialized action details
+- UTC occurrence time
+
+Successful inventory creation and update operations are audited. Inventory-update records include previous and current values and indicate whether the operation created a new reorder event.
+
+Authorization failures and request-validation failures do not create successful business-action audit records.
 
 ### Operations Health Endpoint
 
-The API provides a read-only operations health endpoint:
+The API provides a protected, read-only operations health endpoint:
 
 ```http
 GET /api/operations/health
+X-Demo-User: viewer
 ```
 
 The response reports:
@@ -215,21 +297,24 @@ The React operations dashboard displays this information in the System Health pa
 
 ## Core Workflow
 
-1. Inventory items are created and tracked.
-2. Each item has a quantity on hand and a reorder threshold.
-3. When quantity on hand becomes less than or equal to the threshold, the item transitions to `ReorderPending`.
-4. A reorder event is created with `Status = "Pending"`.
-5. The API publishes a `ReorderRequestedMessage`.
-6. The Processor consumes that message from the queue.
-7. The Processor marks the matching reorder event as `Processed` and completes the Service Bus message.
-8. `Processed` means that the background reorder-request workflow handled the request; it does not mean that stock has already been received.
-9. The inventory item remains `ReorderPending` for as long as its quantity remains at or below its reorder threshold.
-10. A later inventory update can represent newly received stock. When quantity rises above the threshold, the item transitions back to `Active` and the status change is added to reorder history.
+1. An authenticated Operator or Administrator creates or updates an inventory item.
+2. The API validates the request and applies the role-based authorization policy.
+3. Each item has a quantity on hand and a reorder threshold.
+4. When quantity on hand becomes less than or equal to the threshold, the item transitions to `ReorderPending`.
+5. A reorder event is created with `Status = "Pending"`.
+6. The API writes an audit record for the successful inventory action.
+7. The API publishes a `ReorderRequestedMessage`.
+8. The Processor consumes that message from the queue.
+9. The Processor marks the matching reorder event as `Processed` and completes the Service Bus message.
+10. `Processed` means that the background reorder-request workflow handled the request; it does not mean that stock has already been received.
+11. The inventory item remains `ReorderPending` for as long as its quantity remains at or below its reorder threshold.
+12. A later inventory update can represent newly received stock. When quantity rises above the threshold, the item transitions back to `Active`, the status change is added to reorder history, and the update is audited.
 
-This separation keeps two related but distinct states accurate:
+This separation keeps related but distinct concerns accurate:
 
 - **Inventory state:** whether current stock is healthy or requires reordering
 - **Reorder-event state:** whether the background reorder request is still pending or has been processed
+- **Audit state:** which authenticated demo user performed a successful inventory action
 
 ## Data Model
 
@@ -256,6 +341,16 @@ This separation keeps two related but distinct states accurate:
 - `OldStatus`
 - `NewStatus`
 - `ChangedAt`
+
+### AuditRecord
+- `Id`
+- `UserName`
+- `Role`
+- `Action`
+- `EntityType`
+- `EntityId`
+- `Details`
+- `OccurredAt`
 
 ## Screenshots
 
@@ -365,8 +460,15 @@ This prevents an initial low-stock request from creating a pending reorder event
 
 ## Implementation Notes
 
-- `CreatedAt`, `UpdatedAt`, `TriggeredAt`, and `ChangedAt` are server-controlled timestamps.
-- The API uses DTOs for inventory item creation, update, and response shaping.
+- `CreatedAt`, `UpdatedAt`, `TriggeredAt`, `ChangedAt`, and `OccurredAt` are server-controlled timestamps.
+- The API uses DTOs for inventory item creation, update, audit-record responses, and other response shaping.
+- The local demo authentication handler maps `viewer`, `operator`, and `admin` header values to claims and roles.
+- Authorization policies separate read access, operational mutations, and Administrator-only audit review.
+- The React dashboard sends its Operator demo identity through a shared API client.
+- The demo authentication mechanism is intentionally local and is not a substitute for a production identity provider.
+- Successful inventory item creation and update operations create audit records.
+- Inventory-update audit details contain previous and current values and whether a reorder event was created.
+- Rejected authorization and validation requests do not create successful business-action audit records.
 - Inventory item status is derived from business rules rather than being posted directly by the client.
 - The current item status rule is:
   - `QuantityOnHand > ReorderThreshold` → `Active`
@@ -409,12 +511,18 @@ The `-v` option removes attached Docker volumes and should be used only when a f
 - background processing
 - relational data modeling
 - event-driven workflow
+- role-aware operations
+- policy-based authorization
+- inventory action auditing
+- operator-facing dashboard visibility
 - container-aware project structure
 - zero-cost cloud-compatible local development
 - clear documentation
 
 ### Out of scope
-- authentication and authorization
+- production identity-provider integration
+- persistent user-account management
+- complex administrative configuration UI
 - complex UI polish
 - real purchasing integrations
 - external vendor APIs
@@ -435,6 +543,8 @@ This project exists to add proof of:
 - background worker design
 - event-driven processing
 - multi-project distributed application structure
+- role-aware API workflows
+- SQL-backed auditing
 - separation of inventory and workflow state
 - containerized local infrastructure
 - cloud-compatible architecture
@@ -448,6 +558,9 @@ This project is best described as:
 - with an API producer and a background consumer
 - backed by SQL Server
 - using queue-based reorder-request processing
+- providing an operator-facing React dashboard
+- demonstrating policy-based authorization with local demo roles
+- recording successful inventory actions in a SQL-backed audit trail
 - distinguishing inventory state from reorder-event processing state
 - containerized for local execution
 - Azure-compatible in architecture

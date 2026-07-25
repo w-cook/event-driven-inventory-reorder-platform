@@ -3,6 +3,8 @@ using InventoryReorderPlatform.Api.Services;
 using InventoryReorderPlatform.Contracts.Messages;
 using InventoryReorderPlatform.Data;
 using InventoryReorderPlatform.Data.Models;
+using InventoryReorderPlatform.Api.Security;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -14,19 +16,23 @@ namespace InventoryReorderPlatform.Api.Controllers
     {
         private readonly AppDbContext _dbContext;
         private readonly ReorderMessagePublisher _reorderMessagePublisher;
+        private readonly IAuditService _auditService;
         private readonly ILogger<InventoryItemsController> _logger;
 
         public InventoryItemsController(
             AppDbContext dbContext,
             ReorderMessagePublisher reorderMessagePublisher,
+            IAuditService auditService,
             ILogger<InventoryItemsController> logger)
         {
             _dbContext = dbContext;
             _reorderMessagePublisher = reorderMessagePublisher;
+            _auditService = auditService;
             _logger = logger;
         }
 
         [HttpGet("{id:int}")]
+        [Authorize(Policy = AppPolicies.InventoryRead)]
         public async Task<ActionResult<InventoryItemResponse>> GetById([FromRoute] int id)
         {
             var inventoryItem = await _dbContext.InventoryItems
@@ -41,6 +47,7 @@ namespace InventoryReorderPlatform.Api.Controllers
         }
 
         [HttpGet]
+        [Authorize(Policy = AppPolicies.InventoryRead)]
         public async Task<ActionResult<IEnumerable<InventoryItemResponse>>> GetAll()
         {
             var inventoryItems = await _dbContext.InventoryItems
@@ -62,6 +69,7 @@ namespace InventoryReorderPlatform.Api.Controllers
         }
 
         [HttpPost]
+        [Authorize(Policy = AppPolicies.InventoryOperate)]
         public async Task<ActionResult<InventoryItemResponse>> Create(CreateInventoryItemRequest request)
         {
             var inventoryItem = new InventoryItem
@@ -79,6 +87,23 @@ namespace InventoryReorderPlatform.Api.Controllers
             await _dbContext.SaveChangesAsync();
 
             var newReorderEvent = await ApplyInventoryStatusWorkflowAsync(inventoryItem);
+
+            await _auditService.AddRecordAsync(
+                User,
+                AuditActions.InventoryItemCreated,
+                nameof(InventoryItem),
+                inventoryItem.Id.ToString(),
+                new
+                {
+                    inventoryItem.Name,
+                    inventoryItem.Sku,
+                    inventoryItem.QuantityOnHand,
+                    inventoryItem.ReorderThreshold,
+                    inventoryItem.Status,
+                    ReorderEventCreated = newReorderEvent != null
+                },
+                HttpContext.RequestAborted);
+
             await _dbContext.SaveChangesAsync();
 
             if (newReorderEvent != null)
@@ -101,6 +126,7 @@ namespace InventoryReorderPlatform.Api.Controllers
         }
 
         [HttpPut("{id:int}")]
+        [Authorize(Policy = AppPolicies.InventoryOperate)]
         public async Task<ActionResult<InventoryItemResponse>> UpdateInventoryItem(
             [FromRoute] int id,
             UpdateInventoryItemRequest request)
@@ -113,6 +139,15 @@ namespace InventoryReorderPlatform.Api.Controllers
                 return NotFound($"InventoryItemId '{id}' does not exist.");
             }
 
+            var previousState = new
+            {
+                inventoryItem.Name,
+                inventoryItem.Sku,
+                inventoryItem.QuantityOnHand,
+                inventoryItem.ReorderThreshold,
+                inventoryItem.Status
+            };
+
             inventoryItem.Name = request.Name.Trim();
             inventoryItem.Sku = request.Sku.Trim();
             inventoryItem.QuantityOnHand = request.QuantityOnHand;
@@ -124,6 +159,26 @@ namespace InventoryReorderPlatform.Api.Controllers
             {
                 inventoryItem.UpdatedAt = DateTime.UtcNow;
             }
+
+            await _auditService.AddRecordAsync(
+                User,
+                AuditActions.InventoryItemUpdated,
+                nameof(InventoryItem),
+                inventoryItem.Id.ToString(),
+                new
+                {
+                    Previous = previousState,
+                    Current = new
+                    {
+                        inventoryItem.Name,
+                        inventoryItem.Sku,
+                        inventoryItem.QuantityOnHand,
+                        inventoryItem.ReorderThreshold,
+                        inventoryItem.Status
+                    },
+                    ReorderEventCreated = newReorderEvent != null
+                },
+                HttpContext.RequestAborted);
 
             await _dbContext.SaveChangesAsync();
 

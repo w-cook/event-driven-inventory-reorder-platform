@@ -1,38 +1,198 @@
 # Aspire HostAddress
-# @InventoryReorderPlatform.Api_HostAddress = https://localhost:7025
+# @InventoryReorderPlatform.Api_HostAddress=https://localhost:7025
 
 # Docker HostAddress
-@InventoryReorderPlatform.Api_HostAddress = http://localhost:8080
+@InventoryReorderPlatform.Api_HostAddress=http://localhost:8080
 
-###
-# Expected ItemIds
-@firstItemId = 1
-@secondItemId = 2
+@activeItemId=1
+@lowStockItemId=2
 
-###
-# Get all inventory items
+// Inventory Reorder Platform — Manual API Verification
+//
+// Assumptions:
+// - The database is empty before beginning.
+// - The full Docker/local stack is running.
+// - The Service Bus emulator is ready.
+// - Requests are executed from top to bottom.
+//
+// Demo identities:
+// - viewer: read-only access
+// - operator: read access plus inventory creation and updates
+// - admin: read access plus inventory creation and updates
+
+
+// ==========================================================================
+// 1. EMPTY DATABASE AND AUTHORIZATION CHECKS
+// ==========================================================================
+
+// Anonymous inventory read
+// Expected: 401 Unauthorized
+
 GET {{InventoryReorderPlatform.Api_HostAddress}}/api/inventoryitems
 Accept: application/json
 
 ###
-# Get the active item by id
-GET {{InventoryReorderPlatform.Api_HostAddress}}/api/inventoryitems/{{firstItemId}}
+
+// Invalid demo identity
+// Expected: 401 Unauthorized
+
+GET {{InventoryReorderPlatform.Api_HostAddress}}/api/inventoryitems
 Accept: application/json
+X-Demo-User: invalid-user
 
 ###
-# Get all reorder events
+
+// Viewer reads the empty inventory list
+// Expected: 200 OK with []
+
+GET {{InventoryReorderPlatform.Api_HostAddress}}/api/inventoryitems
+Accept: application/json
+X-Demo-User: viewer
+
+###
+
+// Operator reads the empty inventory list
+// Expected: 200 OK with []
+
+GET {{InventoryReorderPlatform.Api_HostAddress}}/api/inventoryitems
+Accept: application/json
+X-Demo-User: operator
+
+###
+
+// Viewer reads the empty reorder-event list
+// Expected: 200 OK with []
+
 GET {{InventoryReorderPlatform.Api_HostAddress}}/api/reorderevents
 Accept: application/json
+X-Demo-User: viewer
 
 ###
-# Get operations health
+
+// Administrator confirms the audit trail is initially empty
+// Expected: 200 OK with []
+
+GET {{InventoryReorderPlatform.Api_HostAddress}}/api/audit-records
+Accept: application/json
+X-Demo-User: admin
+
+###
+
+// Viewer checks operations health against the empty database
+//
+// Expected:
+// - 200 OK
+// - status: Healthy
+// - databaseStatus: Connected
+// - inventoryItemCount: 0
+// - reorderEventCount: 0
+
+GET {{InventoryReorderPlatform.Api_HostAddress}}/api/operations/health
+Accept: application/json
+X-Demo-User: viewer
+
+###
+
+// Anonymous operations-health request
+//
+// Expected:
+// - 401 Unauthorized
+
 GET {{InventoryReorderPlatform.Api_HostAddress}}/api/operations/health
 Accept: application/json
 
 ###
-# Create item ABOVE threshold -> should become Active, no reorder event needed
+
+// Viewer cannot inspect audit records
+// Expected: 403 Forbidden
+
+GET {{InventoryReorderPlatform.Api_HostAddress}}/api/audit-records
+Accept: application/json
+X-Demo-User: viewer
+
+###
+
+// Operator cannot inspect audit records
+// Expected: 403 Forbidden
+
+GET {{InventoryReorderPlatform.Api_HostAddress}}/api/audit-records
+Accept: application/json
+X-Demo-User: operator
+
+###
+
+// Administrator can inspect audit records
+// Expected: 200 OK with []
+
+GET {{InventoryReorderPlatform.Api_HostAddress}}/api/audit-records
+Accept: application/json
+X-Demo-User: admin
+
+###
+
+
+// ==========================================================================
+// 2. VERIFY VIEWER CANNOT CREATE INVENTORY
+// ==========================================================================
+
+###
+
+// Viewer attempts to create an inventory item
+//
+// Expected:
+// - 403 Forbidden
+// - No item is created
+
 POST {{InventoryReorderPlatform.Api_HostAddress}}/api/inventoryitems
 Content-Type: application/json
+X-Demo-User: viewer
+
+{
+  "name": "Unauthorized Test Item",
+  "sku": "AUTH-0001",
+  "quantityOnHand": 10,
+  "reorderThreshold": 5
+}
+
+###
+
+// Confirm the rejected request did not create data
+// Expected: 200 OK with []
+
+GET {{InventoryReorderPlatform.Api_HostAddress}}/api/inventoryitems
+Accept: application/json
+X-Demo-User: viewer
+
+###
+
+// Confirm the rejected Viewer request did not create an audit record
+// Expected: 200 OK with []
+
+GET {{InventoryReorderPlatform.Api_HostAddress}}/api/audit-records
+Accept: application/json
+X-Demo-User: admin
+
+###
+
+
+// ==========================================================================
+// 3. CREATE INITIAL INVENTORY DATA AS OPERATOR
+// ==========================================================================
+
+###
+
+// Create item 1 above its reorder threshold
+//
+// Expected:
+// - 201 Created
+// - id: 1
+// - status: Active
+// - quantityOnHand: 20
+// - No reorder event is created
+
+POST {{InventoryReorderPlatform.Api_HostAddress}}/api/inventoryitems
+Content-Type: application/json
+X-Demo-User: operator
 
 {
   "name": "Mechanical Keyboard",
@@ -42,9 +202,169 @@ Content-Type: application/json
 }
 
 ###
-# Update the first item so it crosses into ReorderPending, creating reorder event
-PUT {{InventoryReorderPlatform.Api_HostAddress}}/api/inventoryitems/{{firstItemId}}
+
+// Confirm the active-item creation was audited
+//
+// Expected:
+// - 200 OK
+// - One InventoryItemCreated record
+// - UserName identifies the Operator
+// - EntityId is "1"
+// - ReorderEventCreated is false
+
+GET {{InventoryReorderPlatform.Api_HostAddress}}/api/audit-records
+Accept: application/json
+X-Demo-User: admin
+
+###
+
+// Create item 2 below its reorder threshold
+//
+// Expected:
+// - 201 Created
+// - id: 2
+// - status: ReorderPending
+// - quantityOnHand: 3
+// - One reorder event is created
+// - One Service Bus message is published
+//
+// The reorder event may briefly appear as Pending. After the Processor
+// consumes the message, the event should become Processed. The inventory
+// item remains ReorderPending because its quantity is still below threshold.
+
+POST {{InventoryReorderPlatform.Api_HostAddress}}/api/inventoryitems
 Content-Type: application/json
+X-Demo-User: operator
+
+{
+  "name": "USB-C Docking Station",
+  "sku": "DOCK-2001",
+  "quantityOnHand": 3,
+  "reorderThreshold": 5
+}
+
+###
+
+// Confirm the low-stock item creation was audited
+//
+// Expected:
+// - Two total audit records
+// - Newest record is InventoryItemCreated for entity "2"
+// - ReorderEventCreated is true
+
+GET {{InventoryReorderPlatform.Api_HostAddress}}/api/audit-records
+Accept: application/json
+X-Demo-User: admin
+
+###
+
+
+// ==========================================================================
+// 4. VERIFY INITIAL INVENTORY STATE
+// ==========================================================================
+
+###
+
+// List all inventory items as Viewer
+//
+// Expected:
+// - 200 OK
+// - Two items
+// - Item 1 is Active
+// - Item 2 is ReorderPending
+
+GET {{InventoryReorderPlatform.Api_HostAddress}}/api/inventoryitems
+Accept: application/json
+X-Demo-User: viewer
+
+###
+
+// Get item 1
+//
+// Expected:
+// - Mechanical Keyboard
+// - quantityOnHand: 20
+// - status: Active
+
+GET {{InventoryReorderPlatform.Api_HostAddress}}/api/inventoryitems/{{activeItemId}}
+Accept: application/json
+X-Demo-User: viewer
+
+###
+
+// Get item 2
+//
+// Expected:
+// - USB-C Docking Station
+// - quantityOnHand: 3
+// - status: ReorderPending
+
+GET {{InventoryReorderPlatform.Api_HostAddress}}/api/inventoryitems/{{lowStockItemId}}
+Accept: application/json
+X-Demo-User: viewer
+
+###
+
+// Request an inventory item that does not exist
+// Expected: 404 Not Found
+
+GET {{InventoryReorderPlatform.Api_HostAddress}}/api/inventoryitems/99999
+Accept: application/json
+X-Demo-User: viewer
+
+###
+
+
+// ==========================================================================
+// 5. VERIFY INITIAL REORDER WORKFLOW
+// ==========================================================================
+
+###
+
+// List reorder events
+//
+// Expected:
+// - 200 OK
+// - One event
+// - inventoryItemId: 2
+// - quantityAtTrigger: 3
+// - status eventually becomes Processed
+
+GET {{InventoryReorderPlatform.Api_HostAddress}}/api/reorderevents
+Accept: application/json
+X-Demo-User: viewer
+
+###
+
+// Check operations health after initial creation
+//
+// Expected:
+// - inventoryItemCount: 2
+// - reorderEventCount: 1
+
+GET {{InventoryReorderPlatform.Api_HostAddress}}/api/operations/health
+Accept: application/json
+X-Demo-User: viewer
+
+###
+
+
+// ==========================================================================
+// 6. VERIFY VIEWER CANNOT UPDATE INVENTORY
+// ==========================================================================
+
+###
+
+// Viewer attempts to move item 1 below its threshold
+//
+// Expected:
+// - 403 Forbidden
+// - Item 1 remains unchanged
+// - No new reorder event is created
+
+PUT {{InventoryReorderPlatform.Api_HostAddress}}/api/inventoryitems/{{activeItemId}}
+Content-Type: application/json
+X-Demo-User: viewer
 
 {
   "name": "Mechanical Keyboard",
@@ -54,9 +374,140 @@ Content-Type: application/json
 }
 
 ###
-# Update the first item lower, without creating duplicate reorder event
-PUT {{InventoryReorderPlatform.Api_HostAddress}}/api/inventoryitems/{{firstItemId}}
+
+// Confirm item 1 was not changed
+//
+// Expected:
+// - quantityOnHand: 20
+// - status: Active
+
+GET {{InventoryReorderPlatform.Api_HostAddress}}/api/inventoryitems/{{activeItemId}}
+Accept: application/json
+X-Demo-User: viewer
+
+###
+
+// Confirm no new reorder event was created
+// Expected: One total reorder event
+
+GET {{InventoryReorderPlatform.Api_HostAddress}}/api/reorderevents
+Accept: application/json
+X-Demo-User: viewer
+
+###
+
+// Confirm the rejected Viewer update did not create an audit record
+// Expected: still two total records
+
+GET {{InventoryReorderPlatform.Api_HostAddress}}/api/audit-records
+Accept: application/json
+X-Demo-User: admin
+
+###
+
+
+// ==========================================================================
+// 7. TRIGGER A REORDER WORKFLOW AS OPERATOR
+// ==========================================================================
+
+###
+
+// Operator lowers item 1 below its threshold
+//
+// Expected:
+// - 200 OK
+// - quantityOnHand: 4
+// - status changes to ReorderPending
+// - A second reorder event is created
+// - A second Service Bus message is published
+
+PUT {{InventoryReorderPlatform.Api_HostAddress}}/api/inventoryitems/{{activeItemId}}
 Content-Type: application/json
+X-Demo-User: operator
+
+{
+  "name": "Mechanical Keyboard",
+  "sku": "KEY-1001",
+  "quantityOnHand": 4,
+  "reorderThreshold": 5
+}
+
+###
+
+// Verify item 1 entered ReorderPending
+//
+// Expected:
+// - quantityOnHand: 4
+// - status: ReorderPending
+
+GET {{InventoryReorderPlatform.Api_HostAddress}}/api/inventoryitems/{{activeItemId}}
+Accept: application/json
+X-Demo-User: viewer
+
+###
+
+// Verify the second reorder event was created
+//
+// Expected:
+// - Two total reorder events
+// - One event for item 1
+// - One event for item 2
+// - Both eventually become Processed
+
+GET {{InventoryReorderPlatform.Api_HostAddress}}/api/reorderevents
+Accept: application/json
+X-Demo-User: viewer
+
+###
+
+// Check updated operations counts
+//
+// Expected:
+// - inventoryItemCount: 2
+// - reorderEventCount: 2
+
+GET {{InventoryReorderPlatform.Api_HostAddress}}/api/operations/health
+Accept: application/json
+X-Demo-User: viewer
+
+###
+
+// Confirm the low-stock transition update was audited
+//
+// Expected:
+// - Three total records
+// - Newest action is InventoryItemUpdated
+// - EntityId is "1"
+// - Previous quantity is 20
+// - Current quantity is 4
+// - Previous status is Active
+// - Current status is ReorderPending
+// - ReorderEventCreated is true
+
+GET {{InventoryReorderPlatform.Api_HostAddress}}/api/audit-records
+Accept: application/json
+X-Demo-User: admin
+
+###
+
+
+// ==========================================================================
+// 8. VERIFY REPEATED LOW-STOCK UPDATES DO NOT CREATE BUSINESS DUPLICATES
+// ==========================================================================
+
+###
+
+// Lower item 1 further while it is already ReorderPending
+//
+// Expected:
+// - 200 OK
+// - quantityOnHand changes to 2
+// - status remains ReorderPending
+// - No additional reorder event is created
+
+PUT {{InventoryReorderPlatform.Api_HostAddress}}/api/inventoryitems/{{activeItemId}}
+Content-Type: application/json
+X-Demo-User: operator
 
 {
   "name": "Mechanical Keyboard",
@@ -66,9 +517,72 @@ Content-Type: application/json
 }
 
 ###
-# Recover the first item above threshold -> should go back to Active
-PUT {{InventoryReorderPlatform.Api_HostAddress}}/api/inventoryitems/{{firstItemId}}
+
+// Verify item 1 remains ReorderPending
+//
+// Expected:
+// - quantityOnHand: 2
+// - status: ReorderPending
+
+GET {{InventoryReorderPlatform.Api_HostAddress}}/api/inventoryitems/{{activeItemId}}
+Accept: application/json
+X-Demo-User: viewer
+
+###
+
+// Verify no duplicate reorder event was created
+// Expected: Still two total reorder events
+
+GET {{InventoryReorderPlatform.Api_HostAddress}}/api/reorderevents
+Accept: application/json
+X-Demo-User: viewer
+
+###
+
+// Confirm counts remain unchanged
+//
+// Expected:
+// - inventoryItemCount: 2
+// - reorderEventCount: 2
+
+GET {{InventoryReorderPlatform.Api_HostAddress}}/api/operations/health
+Accept: application/json
+X-Demo-User: viewer
+
+###
+
+// Confirm the repeated low-stock update was audited
+//
+// Expected:
+// - Four total records
+// - Newest action is InventoryItemUpdated
+// - Current quantity is 2
+// - ReorderEventCreated is false
+
+GET {{InventoryReorderPlatform.Api_HostAddress}}/api/audit-records
+Accept: application/json
+X-Demo-User: admin
+
+###
+
+
+// ==========================================================================
+// 9. RESTOCK ITEM 1 ABOVE ITS THRESHOLD
+// ==========================================================================
+
+###
+
+// Operator records received stock for item 1
+//
+// Expected:
+// - 200 OK
+// - quantityOnHand: 12
+// - status changes to Active
+// - No additional reorder event is created
+
+PUT {{InventoryReorderPlatform.Api_HostAddress}}/api/inventoryitems/{{activeItemId}}
 Content-Type: application/json
+X-Demo-User: operator
 
 {
   "name": "Mechanical Keyboard",
@@ -78,13 +592,252 @@ Content-Type: application/json
 }
 
 ###
-# Create item BELOW threshold -> should become ReorderPending, creating reorder event
-POST {{InventoryReorderPlatform.Api_HostAddress}}/api/inventoryitems
+
+// Verify item 1 returned to Active
+//
+// Expected:
+// - quantityOnHand: 12
+// - status: Active
+
+GET {{InventoryReorderPlatform.Api_HostAddress}}/api/inventoryitems/{{activeItemId}}
+Accept: application/json
+X-Demo-User: viewer
+
+###
+
+// Verify restocking did not create another reorder event
+// Expected: Still two total reorder events
+
+GET {{InventoryReorderPlatform.Api_HostAddress}}/api/reorderevents
+Accept: application/json
+X-Demo-User: viewer
+
+###
+
+// Confirm the restock update was audited
+//
+// Expected:
+// - Five total records
+// - Previous status is ReorderPending
+// - Current status is Active
+// - Current quantity is 12
+// - ReorderEventCreated is false
+
+GET {{InventoryReorderPlatform.Api_HostAddress}}/api/audit-records
+Accept: application/json
+X-Demo-User: admin
+
+###
+
+
+// ==========================================================================
+// 10. VERIFY ADMINISTRATOR ACCESS
+// ==========================================================================
+
+###
+
+// Administrator reads inventory
+// Expected: 200 OK
+
+GET {{InventoryReorderPlatform.Api_HostAddress}}/api/inventoryitems
+Accept: application/json
+X-Demo-User: admin
+
+###
+
+// Administrator updates item 1 while it remains above threshold
+//
+// Expected:
+// - 200 OK
+// - quantityOnHand: 15
+// - status remains Active
+// - No new reorder event is created
+
+PUT {{InventoryReorderPlatform.Api_HostAddress}}/api/inventoryitems/{{activeItemId}}
 Content-Type: application/json
+X-Demo-User: admin
 
 {
-  "name": "USB-C Docking Station",
-  "sku": "DOCK-2001",
-  "quantityOnHand": 3,
+  "name": "Mechanical Keyboard",
+  "sku": "KEY-1001",
+  "quantityOnHand": 15,
   "reorderThreshold": 5
 }
+
+###
+
+// Confirm the Administrator update was audited
+//
+// Expected:
+// - Six total records
+// - Newest action is InventoryItemUpdated
+// - UserName identifies the Administrator
+// - Role is Administrator
+// - Current quantity is 15
+
+GET {{InventoryReorderPlatform.Api_HostAddress}}/api/audit-records
+Accept: application/json
+X-Demo-User: admin
+
+###
+
+// Administrator reads reorder events
+// Expected: 200 OK with two events
+
+GET {{InventoryReorderPlatform.Api_HostAddress}}/api/reorderevents
+Accept: application/json
+X-Demo-User: admin
+
+###
+
+// Administrator reads operations health
+//
+// Expected:
+// - inventoryItemCount: 2
+// - reorderEventCount: 2
+
+GET {{InventoryReorderPlatform.Api_HostAddress}}/api/operations/health
+Accept: application/json
+X-Demo-User: admin
+
+###
+
+
+// ==========================================================================
+// 11. REQUEST VALIDATION CHECKS
+// ==========================================================================
+
+###
+
+// Submit an invalid negative quantity
+//
+// Expected:
+// - 400 Bad Request
+// - No item is created
+
+POST {{InventoryReorderPlatform.Api_HostAddress}}/api/inventoryitems
+Content-Type: application/json
+X-Demo-User: operator
+
+{
+  "name": "Invalid Inventory Item",
+  "sku": "INVALID-0001",
+  "quantityOnHand": -1,
+  "reorderThreshold": 5
+}
+
+###
+
+// Submit an invalid negative threshold
+//
+// Expected:
+// - 400 Bad Request
+// - No item is created
+
+POST {{InventoryReorderPlatform.Api_HostAddress}}/api/inventoryitems
+Content-Type: application/json
+X-Demo-User: operator
+
+{
+  "name": "Invalid Threshold Item",
+  "sku": "INVALID-0002",
+  "quantityOnHand": 10,
+  "reorderThreshold": -1
+}
+
+###
+
+// Submit an empty name and SKU
+//
+// Expected:
+// - 400 Bad Request
+// - No item is created
+
+POST {{InventoryReorderPlatform.Api_HostAddress}}/api/inventoryitems
+Content-Type: application/json
+X-Demo-User: operator
+
+{
+  "name": "",
+  "sku": "",
+  "quantityOnHand": 10,
+  "reorderThreshold": 5
+}
+
+###
+
+// Confirm invalid requests did not create inventory items
+// Expected: Still two total items
+
+GET {{InventoryReorderPlatform.Api_HostAddress}}/api/inventoryitems
+Accept: application/json
+X-Demo-User: viewer
+
+###
+
+// Confirm invalid requests did not create audit records
+//
+// Expected:
+// - Six total audit records
+// - No records corresponding to rejected or invalid requests
+
+GET {{InventoryReorderPlatform.Api_HostAddress}}/api/audit-records
+Accept: application/json
+X-Demo-User: admin
+
+###
+
+
+// ==========================================================================
+// 12. FINAL STATE VERIFICATION
+// ==========================================================================
+
+###
+
+// Final inventory state
+//
+// Expected item 1:
+// - Mechanical Keyboard
+// - quantityOnHand: 15
+// - reorderThreshold: 5
+// - status: Active
+//
+// Expected item 2:
+// - USB-C Docking Station
+// - quantityOnHand: 3
+// - reorderThreshold: 5
+// - status: ReorderPending
+
+GET {{InventoryReorderPlatform.Api_HostAddress}}/api/inventoryitems
+Accept: application/json
+X-Demo-User: viewer
+
+###
+
+// Final reorder-event state
+//
+// Expected:
+// - Two total reorder events
+// - One event for item 1
+// - One event for item 2
+// - Both eventually have status: Processed
+
+GET {{InventoryReorderPlatform.Api_HostAddress}}/api/reorderevents
+Accept: application/json
+X-Demo-User: viewer
+
+###
+
+// Final operations-health state
+//
+// Expected:
+// - status: Healthy
+// - databaseStatus: Connected
+// - inventoryItemCount: 2
+// - reorderEventCount: 2
+
+GET {{InventoryReorderPlatform.Api_HostAddress}}/api/operations/health
+Accept: application/json
+X-Demo-User: viewer
+
+###

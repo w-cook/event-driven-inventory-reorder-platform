@@ -4,6 +4,7 @@ import './App.css'
 import { listInventoryItems } from './api/inventoryItems'
 import { listReorderEvents } from './api/reorderEvents'
 import { getSystemHealth } from './api/systemHealth'
+import { DEMO_ROLE_LABEL } from './api/httpClient'
 import { InventorySummaryCards } from './components/InventorySummaryCards'
 import { InventoryTable } from './components/InventoryTable'
 import { ReorderWorkflowPanel } from './components/ReorderWorkflowPanel'
@@ -81,7 +82,10 @@ function App() {
   return (
     <main className="page">
       <header className="hero">
+        <p className="eyebrow">Demo role: {DEMO_ROLE_LABEL}</p>
+
         <h1>Inventory Operations Dashboard</h1>
+        
         <p>
           Operator-facing dashboard for inventory visibility, low-stock review,
           reorder workflow status, processing history, and system health.

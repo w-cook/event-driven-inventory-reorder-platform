@@ -35,11 +35,11 @@ This expansion focuses on production-readiness concerns that commonly appear in 
 
 ### Phase 2 — Authorization and Audit Trail
 
-- [ ] role-based access model
-- [ ] Viewer role for read-only access
-- [ ] Operator role for quantity updates and workflow actions
-- [ ] Administrator role for user/configuration management if scope allows
-- [ ] audit records for important user actions
+- [x] role-based access model
+- [x] Viewer role for read-only access
+- [x] Operator role for quantity updates and workflow actions
+- [x] Administrator role for user/configuration management if scope allows
+- [x] audit records for important user actions
 
 ### Phase 3 — Reliable Message Processing
 
