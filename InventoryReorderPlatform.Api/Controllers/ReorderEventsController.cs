@@ -1,5 +1,7 @@
 ﻿using InventoryReorderPlatform.Data;
 using InventoryReorderPlatform.Api.DTOs;
+using InventoryReorderPlatform.Api.Security;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -7,6 +9,7 @@ namespace InventoryReorderPlatform.Api.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize(Policy = AppPolicies.InventoryRead)]
     public class ReorderEventsController : ControllerBase
     {
         private readonly AppDbContext _dbContext;

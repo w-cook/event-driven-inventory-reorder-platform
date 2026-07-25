@@ -3,6 +3,8 @@ using InventoryReorderPlatform.Api.Services;
 using InventoryReorderPlatform.Contracts.Messages;
 using InventoryReorderPlatform.Data;
 using InventoryReorderPlatform.Data.Models;
+using InventoryReorderPlatform.Api.Security;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -27,6 +29,7 @@ namespace InventoryReorderPlatform.Api.Controllers
         }
 
         [HttpGet("{id:int}")]
+        [Authorize(Policy = AppPolicies.InventoryRead)]
         public async Task<ActionResult<InventoryItemResponse>> GetById([FromRoute] int id)
         {
             var inventoryItem = await _dbContext.InventoryItems
@@ -41,6 +44,7 @@ namespace InventoryReorderPlatform.Api.Controllers
         }
 
         [HttpGet]
+        [Authorize(Policy = AppPolicies.InventoryRead)]
         public async Task<ActionResult<IEnumerable<InventoryItemResponse>>> GetAll()
         {
             var inventoryItems = await _dbContext.InventoryItems
@@ -62,6 +66,7 @@ namespace InventoryReorderPlatform.Api.Controllers
         }
 
         [HttpPost]
+        [Authorize(Policy = AppPolicies.InventoryOperate)]
         public async Task<ActionResult<InventoryItemResponse>> Create(CreateInventoryItemRequest request)
         {
             var inventoryItem = new InventoryItem
@@ -101,6 +106,7 @@ namespace InventoryReorderPlatform.Api.Controllers
         }
 
         [HttpPut("{id:int}")]
+        [Authorize(Policy = AppPolicies.InventoryOperate)]
         public async Task<ActionResult<InventoryItemResponse>> UpdateInventoryItem(
             [FromRoute] int id,
             UpdateInventoryItemRequest request)
