@@ -25,13 +25,14 @@ body {
   box-shadow: 0 10px 24px rgb(15 23 42 / 0.06);
 }
 
-.eyebrow {
-  margin: 0 0 0.5rem;
+.hero .eyebrow {
+  margin: 0 auto 0.75rem;
   font-size: 0.8rem;
   font-weight: 700;
   color: #2563eb;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+  text-align: center;
 }
 
 .hero h1 {

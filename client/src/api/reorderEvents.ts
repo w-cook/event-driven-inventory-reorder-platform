@@ -1,15 +1,8 @@
 import type { ReorderEvent } from '../types/reorderEvent'
-
-async function handleResponse<T>(response: Response): Promise<T> {
-  if (!response.ok) {
-    throw new Error(`Request failed with status ${response.status}`)
-  }
-
-  return response.json() as Promise<T>
-}
+import { apiFetch, handleJsonResponse } from './httpClient'
 
 export async function listReorderEvents(): Promise<ReorderEvent[]> {
-  const response = await fetch('/api/reorderevents')
+  const response = await apiFetch('/api/reorderevents')
 
-  return handleResponse<ReorderEvent[]>(response)
+  return handleJsonResponse<ReorderEvent[]>(response)
 }
