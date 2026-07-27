@@ -3,6 +3,7 @@
   <Project Path="InventoryReorderPlatform.AppHost/InventoryReorderPlatform.AppHost.csproj" />
   <Project Path="InventoryReorderPlatform.Contracts/InventoryReorderPlatform.Contracts.csproj" Id="503bb007-8be0-4bff-a128-38357834a834" />
   <Project Path="InventoryReorderPlatform.Data/InventoryReorderPlatform.Data.csproj" Id="a61d0f03-da3c-450a-b3fd-925baff7831f" />
+  <Project Path="InventoryReorderPlatform.Processor.Tests/InventoryReorderPlatform.Processor.Tests.csproj" Id="65e7cf5e-79ea-4e40-962a-5f6d0fe8d8c2" />
   <Project Path="InventoryReorderPlatform.Processor/InventoryReorderPlatform.Processor.csproj" />
   <Project Path="InventoryReorderPlatform.ServiceDefaults/InventoryReorderPlatform.ServiceDefaults.csproj" />
 </Solution>
