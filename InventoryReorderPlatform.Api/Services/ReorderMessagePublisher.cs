@@ -31,13 +31,15 @@ namespace InventoryReorderPlatform.Api.Services
             var serviceBusMessage = new ServiceBusMessage(json)
             {
                 ContentType = "application/json",
-                Subject = "ReorderRequested"
+                Subject = "ReorderRequested",
+                MessageId = $"reorder-event-{message.ReorderEventId}"
             };
 
             await sender.SendMessageAsync(serviceBusMessage, cancellationToken);
 
             _logger.LogInformation(
-                "Published reorder message for ReorderEventId {ReorderEventId}.",
+                "Published reorder message {MessageId} for ReorderEventId {ReorderEventId}.",
+                serviceBusMessage.MessageId,
                 message.ReorderEventId);
         }
     }

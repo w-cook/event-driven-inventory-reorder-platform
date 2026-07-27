@@ -14,5 +14,22 @@ namespace InventoryReorderPlatform.Data
         public DbSet<ReorderHistory> ReorderHistoryEntries => Set<ReorderHistory>();
 
         public DbSet<AuditRecord> AuditRecords => Set<AuditRecord>();
+
+        public DbSet<ProcessedMessage> ProcessedMessages => Set<ProcessedMessage>();
+
+        public DbSet<FailedMessage> FailedMessages => Set<FailedMessage>();
+
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        {
+            base.OnModelCreating(modelBuilder);
+
+            modelBuilder.Entity<ProcessedMessage>()
+                .HasIndex(message => new
+                {
+                    message.MessageId,
+                    message.MessageType
+                })
+                .IsUnique();
+        }
     }
 }

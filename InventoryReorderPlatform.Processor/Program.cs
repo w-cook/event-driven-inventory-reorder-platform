@@ -2,12 +2,17 @@ using Azure.Messaging.ServiceBus;
 using InventoryReorderPlatform.Contracts.Configuration;
 using InventoryReorderPlatform.Data;
 using InventoryReorderPlatform.Processor;
+using InventoryReorderPlatform.Processor.Processing;
 
 var builder = Host.CreateApplicationBuilder(args);
 
 builder.AddServiceDefaults();
 
 builder.AddSqlServerDbContext<AppDbContext>(connectionName: "inventorydb");
+
+builder.Services.AddScoped<
+    IReorderMessageProcessor,
+    ReorderMessageProcessor>();
 
 builder.Services.AddHostedService<Worker>();
 

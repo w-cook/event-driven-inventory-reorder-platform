@@ -43,11 +43,11 @@ This expansion focuses on production-readiness concerns that commonly appear in 
 
 ### Phase 3 — Reliable Message Processing
 
-- [ ] idempotent message consumption
-- [ ] duplicate-message protection
-- [ ] retry behavior for processor failures
-- [ ] failed-processing or poison-message handling
-- [ ] tests proving duplicate delivery does not create duplicate business results
+- [x] idempotent message consumption
+- [x] duplicate-message protection
+- [x] retry behavior for processor failures
+- [x] failed-processing or poison-message handling
+- [x] tests proving duplicate delivery does not create duplicate business results
 
 ### Phase 4 — Observability
 
