@@ -4,23 +4,25 @@
 
 The original Event-Driven Inventory Reorder Platform demonstrated a distributed backend workflow with an ASP.NET Core API, background worker, SQL-backed state, Docker-based local development, and queue-based reorder processing.
 
-That foundation is useful, but real operational systems also need visibility, reliability, authorization, and debugging support.
+That foundation is useful, but practical operational systems also need visibility, authorization, auditability, failure handling, and protection against duplicate message delivery.
 
 ## Expansion Goal
 
 This expansion adds production-readiness concerns to the existing system without replacing the original architecture.
 
-The goal is to show how a backend workflow can evolve from a functional event-driven demo into a more operationally useful system.
+The goal is to show how a functional event-driven demo can evolve into a more operationally useful internal business system while keeping the implementation practical, reproducible, and accurately scoped.
 
 ## Key Engineering Themes
 
 ### Operator Visibility
 
-A React/TypeScript dashboard provides visibility into inventory items, low-stock conditions, reorder state, processing history, and system health.
+A React/TypeScript dashboard provides visibility into inventory items, low-stock conditions, reorder state, processing history, workflow summaries, and system health.
+
+The dashboard consumes the existing API rather than duplicating business rules in the client. Inventory status calculation, reorder-event creation, and authorization remain backend responsibilities.
 
 ### Role-Aware Workflows
 
-The API now uses a small demo authentication scheme and policy-based authorization to model three operational roles:
+The API uses a local demo authentication scheme and policy-based authorization to model three operational roles:
 
 - `Viewer` can read inventory, reorder workflow, and system-health data.
 - `Operator` can perform the same read operations and can create or update inventory items.
@@ -32,7 +34,7 @@ The authentication mechanism is intentionally local and portfolio-focused. It de
 
 ### Audit Trail
 
-Successful inventory creation and update operations now create SQL-backed audit records.
+Successful inventory creation and update operations create SQL-backed audit records.
 
 Each audit record captures:
 
@@ -49,27 +51,58 @@ Audit records are exposed through an Administrator-only read endpoint:
 
 ```http
 GET /api/audit-records
+X-Demo-User: admin
 ```
 
 ### Reliable Message Processing
 
-The processor will be hardened against duplicate messages, transient failures, and failed-processing scenarios.
+The Processor now uses stable Service Bus message identifiers derived from reorder-event ids.
+
+Successful messages are recorded in a SQL-backed `ProcessedMessages` ledger. Before performing business processing, the Processor checks whether the same message id and message type have already been handled. Duplicate deliveries are completed without repeating the business operation.
+
+A unique database index provides additional protection against concurrent duplicate processing.
+
+Valid messages that fail business processing create `FailedMessages` records containing the failure reason, original payload when available, delivery attempt count, and UTC failure time.
+
+Retryable failures are abandoned until the configured maximum delivery count is reached. Messages that continue failing are then moved to the dead-letter queue. Malformed or unsupported payloads are dead-lettered immediately because retrying them cannot make them valid.
+
+This design accepts at-least-once queue delivery and makes duplicate delivery harmless through idempotent processing rather than claiming exactly-once delivery.
+
+The project still models an internal reorder-request workflow. A real supplier integration would occur before a reorder event is marked `Processed`, and the stable message id could be passed to that external system as an idempotency key.
 
 ### Observability
 
-Structured logs, correlation identifiers, health checks, and trace examples will make the system easier to debug and explain.
+The project currently includes application health and readiness endpoints, along with a dashboard-oriented operations health endpoint that checks database connectivity and reports current inventory and reorder-event counts.
+
+Structured logging, correlation identifiers, trace examples, and OpenTelemetry integration remain planned work for the next expansion phase.
 
 ### Production-Oriented Testing
 
-The expansion will add tests around duplicate delivery, authorization, failed processing, and end-to-end reorder behavior.
+The Processor business logic is separated from Service Bus transport settlement so its reliability behavior can be tested directly.
+
+The current xUnit v3 tests verify that:
+
+- successful processing updates the reorder event and records the processed message
+- duplicate delivery does not create a duplicate business result
+- failed processing creates a persisted failure record with payload and attempt information
+
+Direct Worker settlement tests are not currently included because the Worker depends on concrete Azure Service Bus transport types. Adding a separate transport abstraction solely for those tests would add more complexity than this phase requires.
+
+The official Azure Service Bus Emulator remains available for manual producer/consumer verification without requiring paid Azure infrastructure.
 
 ## Portfolio Value
 
 This project phase demonstrates practical backend engineering concerns that transfer across stacks:
 
 - distributed workflow reliability
+- idempotent message processing
+- duplicate-delivery protection
+- retry and dead-letter behavior
 - operational diagnostics
-- authorization
-- automated testing
+- role-based authorization
+- SQL-backed auditing
+- production-oriented automated testing
 - frontend visibility for backend systems
-- maintainable production-style documentation
+- maintainable and accurately scoped documentation
+
+The expansion strengthens the project as evidence of practical C#/.NET backend development while keeping its limitations and claims fully defensible.
