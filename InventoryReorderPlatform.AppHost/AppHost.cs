@@ -5,12 +5,20 @@ var sql = builder.AddSqlServer("sql")
 
 var inventorydb = sql.AddDatabase("inventorydb");
 
-builder.AddProject<Projects.InventoryReorderPlatform_Api>("api")
-       .WithReference(inventorydb)
-       .WaitFor(inventorydb);
+var api = builder
+    .AddProject<Projects.InventoryReorderPlatform_Api>("api")
+    .WithReference(inventorydb)
+    .WaitFor(inventorydb);
 
-builder.AddProject<Projects.InventoryReorderPlatform_Processor>("processor")
-       .WithReference(inventorydb)
-       .WaitFor(inventorydb);
+builder
+    .AddProject<Projects.InventoryReorderPlatform_Processor>("processor")
+    .WithReference(inventorydb)
+    .WaitFor(inventorydb);
+
+builder
+    .AddViteApp("client", "../client")
+    .WithReference(api)
+    .WaitFor(api)
+    .WithEnvironment("VITE_DEMO_USER", "operator");
 
 builder.Build().Run();
