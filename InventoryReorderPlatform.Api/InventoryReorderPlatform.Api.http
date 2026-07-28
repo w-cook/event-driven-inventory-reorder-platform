@@ -7,11 +7,15 @@
 @activeItemId=1
 @lowStockItemId=2
 
+@initialReorderCorrelationId=manual-reorder-create-001
+@transitionReorderCorrelationId=manual-reorder-update-001
+
 // Inventory Reorder Platform — Manual API Verification
 //
 // Assumptions:
 // - The database is empty before beginning.
-// - The full Docker/local stack is running.
+// - Either the full Docker/local stack or the Aspire AppHost is running.
+// - InventoryReorderPlatform.Api_HostAddress points to the active API endpoint.
 // - The Service Bus emulator is ready.
 // - Requests are executed from top to bottom.
 //
@@ -19,6 +23,15 @@
 // - viewer: read-only access
 // - operator: read access plus inventory creation and updates
 // - admin: read access plus inventory creation and updates
+//
+//
+// Observability verification:
+//
+// Use initialReorderCorrelationId and transitionReorderCorrelationId to search
+// the API and Processor logs in Aspire. The corresponding trace should include
+// PublishReorderMessage and ProcessReorderMessage.
+//
+// See docs/observability-runbook.md for the complete debugging procedure.
 
 
 // ==========================================================================
@@ -227,6 +240,8 @@ X-Demo-User: admin
 // - quantityOnHand: 3
 // - One reorder event is created
 // - One Service Bus message is published
+// - Response X-Correlation-Id matches initialReorderCorrelationId
+// - API and Processor telemetry share the correlation identifier
 //
 // The reorder event may briefly appear as Pending. After the Processor
 // consumes the message, the event should become Processed. The inventory
@@ -235,6 +250,7 @@ X-Demo-User: admin
 POST {{InventoryReorderPlatform.Api_HostAddress}}/api/inventoryitems
 Content-Type: application/json
 X-Demo-User: operator
+X-Correlation-Id: {{initialReorderCorrelationId}}
 
 {
   "name": "USB-C Docking Station",
@@ -420,10 +436,13 @@ X-Demo-User: admin
 // - status changes to ReorderPending
 // - A second reorder event is created
 // - A second Service Bus message is published
+// - Response X-Correlation-Id matches transitionReorderCorrelationId
+// - API and Processor telemetry share the correlation identifier
 
 PUT {{InventoryReorderPlatform.Api_HostAddress}}/api/inventoryitems/{{activeItemId}}
 Content-Type: application/json
 X-Demo-User: operator
+X-Correlation-Id: {{transitionReorderCorrelationId}}
 
 {
   "name": "Mechanical Keyboard",

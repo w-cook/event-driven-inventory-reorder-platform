@@ -72,9 +72,15 @@ The project still models an internal reorder-request workflow. A real supplier i
 
 ### Observability
 
-The project currently includes application health and readiness endpoints, along with a dashboard-oriented operations health endpoint that checks database connectivity and reports current inventory and reorder-event counts.
+The API and Processor use the shared Aspire service defaults for structured OpenTelemetry logging, metrics, ASP.NET Core tracing, HTTP client tracing, and local OTLP export.
 
-Structured logging, correlation identifiers, trace examples, and OpenTelemetry integration remain planned work for the next expansion phase.
+Each API request accepts or generates an `X-Correlation-Id`. The identifier is returned to the caller and propagated through the Service Bus message so API and Processor lifecycle logs can be searched using the same value. This correlation identifier is diagnostic and remains separate from the stable Service Bus message id used for idempotency.
+
+The platform also propagates W3C trace context through Service Bus application properties. Custom `PublishReorderMessage` and `ProcessReorderMessage` activities represent the application-owned producer and consumer boundaries. Their attributes describe the queue, message, inventory item, reorder event, delivery attempt, processing outcome, and settlement result.
+
+This approach extends the project’s existing Aspire infrastructure instead of adding a separate telemetry stack. It provides locally reproducible distributed diagnostics without claiming production log retention, cloud monitoring, or alerting services.
+
+Operational verification steps are kept separately in `docs/observability-runbook.md`.
 
 ### Production-Oriented Testing
 
@@ -85,6 +91,7 @@ The current xUnit v3 tests verify that:
 - successful processing updates the reorder event and records the processed message
 - duplicate delivery does not create a duplicate business result
 - failed processing creates a persisted failure record with payload and attempt information
+- correlation middleware generates an identifier when one is absent and preserves a caller-supplied identifier when one is provided
 
 Direct Worker settlement tests are not currently included because the Worker depends on concrete Azure Service Bus transport types. Adding a separate transport abstraction solely for those tests would add more complexity than this phase requires.
 

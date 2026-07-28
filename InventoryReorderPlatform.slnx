@@ -1,4 +1,5 @@
 <Solution>
+  <Project Path="InventoryReorderPlatform.Api.Tests/InventoryReorderPlatform.Api.Tests.csproj" Id="696d9c12-ba86-440a-9ad6-8281d4460ab9" />
   <Project Path="InventoryReorderPlatform.Api/InventoryReorderPlatform.Api.csproj" />
   <Project Path="InventoryReorderPlatform.AppHost/InventoryReorderPlatform.AppHost.csproj" />
   <Project Path="InventoryReorderPlatform.Contracts/InventoryReorderPlatform.Contracts.csproj" Id="503bb007-8be0-4bff-a128-38357834a834" />
