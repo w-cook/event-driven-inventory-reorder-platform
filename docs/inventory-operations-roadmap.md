@@ -60,13 +60,13 @@ This expansion focuses on production-readiness concerns that commonly appear in 
 ### Phase 5 — Production-Oriented Tests and Documentation
 
 - [ ] authorization tests
-- [ ] duplicate-message tests
+- [x] duplicate-message tests
 - [ ] processor failure/recovery tests
 - [ ] end-to-end workflow test with containerized dependencies where practical
 - [ ] architecture diagram
-- [ ] failure scenarios
-- [ ] reliability decisions and tradeoffs
-- [ ] operational runbook
+- [x] failure scenarios
+- [x] reliability decisions and tradeoffs
+- [x] operational runbook
 
 ## Non-Goals
 
