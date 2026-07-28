@@ -1,4 +1,5 @@
 using Azure.Messaging.ServiceBus;
+using InventoryReorderPlatform.Api.Middleware;
 using InventoryReorderPlatform.Api.Security;
 using InventoryReorderPlatform.Api.Services;
 using InventoryReorderPlatform.Contracts.Configuration;
@@ -15,6 +16,12 @@ builder.AddSqlServerDbContext<AppDbContext>(
 
 // Add services to the container.
 builder.Services.AddControllers();
+
+builder.Services.AddHttpContextAccessor();
+
+builder.Services.AddSingleton<
+    ICorrelationIdAccessor,
+    CorrelationIdAccessor>();
 
 builder.Services.AddScoped<IAuditService, AuditService>();
 
@@ -88,6 +95,8 @@ using (var scope = app.Services.CreateScope())
 
     dbContext.Database.Migrate();
 }
+
+app.UseMiddleware<CorrelationIdMiddleware>();
 
 app.UseAuthentication();
 app.UseAuthorization();

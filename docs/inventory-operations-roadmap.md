@@ -51,11 +51,11 @@ This expansion focuses on production-readiness concerns that commonly appear in 
 
 ### Phase 4 — Observability
 
-- [ ] structured logging
-- [ ] correlation identifiers across API and processor
+- [x] structured logging
+- [x] correlation identifiers across API and processor
 - [x] health/readiness endpoints
-- [ ] OpenTelemetry traces where practical
-- [ ] documented examples for debugging a reorder workflow
+- [x] OpenTelemetry traces where practical
+- [x] documented examples for debugging a reorder workflow
 
 ### Phase 5 — Production-Oriented Tests and Documentation
 

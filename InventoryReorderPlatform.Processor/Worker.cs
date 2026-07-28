@@ -1,7 +1,9 @@
+using System.Diagnostics;
 using System.Text.Json;
 using Azure.Messaging.ServiceBus;
 using InventoryReorderPlatform.Contracts.Configuration;
 using InventoryReorderPlatform.Contracts.Messages;
+using InventoryReorderPlatform.Observability;
 using InventoryReorderPlatform.Processor.Processing;
 using Microsoft.Extensions.Options;
 
@@ -84,6 +86,46 @@ public class Worker : BackgroundService
         ServiceBusReceivedMessage message,
         CancellationToken cancellationToken)
     {
+        var correlationId = GetCorrelationId(message);
+
+        using var activity =
+            StartProcessingActivity(message);
+
+        activity?.SetTag(
+            "messaging.system",
+            "servicebus");
+
+        activity?.SetTag(
+            "messaging.destination.name",
+            _options.QueueName);
+
+        activity?.SetTag(
+            "messaging.message.id",
+            message.MessageId);
+
+        activity?.SetTag(
+            "messaging.operation.name",
+            "process");
+
+        activity?.SetTag(
+            "messaging.delivery.count",
+            message.DeliveryCount);
+
+        activity?.SetTag(
+            "correlation.id",
+            correlationId);
+
+        using var loggingScope =
+            _logger.BeginScope(new Dictionary<string, object>
+            {
+                ["CorrelationId"] = correlationId,
+                ["MessageId"] = message.MessageId,
+                ["TraceId"] =
+                    activity?.TraceId.ToString() ??
+                    Activity.Current?.TraceId.ToString() ??
+                    string.Empty
+            });
+
         var rawPayload = message.Body.ToString();
 
         ReorderRequestedMessage? reorderMessage;
@@ -100,6 +142,18 @@ public class Worker : BackgroundService
                 ex,
                 "Message {MessageId} contained invalid JSON.",
                 message.MessageId);
+
+            activity?.SetTag(
+                "reorder.outcome",
+                "invalid-json");
+
+            activity?.SetTag(
+                "messaging.settlement",
+                "dead-lettered");
+
+            activity?.SetStatus(
+                ActivityStatusCode.Error,
+                "Invalid JSON payload");
 
             await receiver.DeadLetterMessageAsync(
                 message,
@@ -118,6 +172,18 @@ public class Worker : BackgroundService
                 "reorder request.",
                 message.MessageId);
 
+            activity?.SetTag(
+                "reorder.outcome",
+                "invalid-payload");
+
+            activity?.SetTag(
+                "messaging.settlement",
+                "dead-lettered");
+
+            activity?.SetStatus(
+                ActivityStatusCode.Error,
+                "Missing reorder request");
+
             await receiver.DeadLetterMessageAsync(
                 message,
                 deadLetterReason: "InvalidPayload",
@@ -128,12 +194,22 @@ public class Worker : BackgroundService
             return;
         }
 
+        activity?.SetTag(
+            "reorder.event.id",
+            reorderMessage.ReorderEventId);
+
+        activity?.SetTag(
+            "inventory.item.id",
+            reorderMessage.InventoryItemId);
+
         _logger.LogInformation(
-            "Received reorder message {MessageId} for " +
-            "ReorderEventId {ReorderEventId} on delivery {DeliveryCount}.",
+            "Received reorder message {MessageId} for ReorderEventId " +
+            "{ReorderEventId} on delivery {DeliveryCount} with " +
+            "CorrelationId {CorrelationId}.",
             message.MessageId,
             reorderMessage.ReorderEventId,
-            message.DeliveryCount);
+            message.DeliveryCount,
+            correlationId);
 
         using var scope = _scopeFactory.CreateScope();
 
@@ -156,13 +232,28 @@ public class Worker : BackgroundService
         {
             _logger.LogError(
                 ex,
-                "Unhandled failure while processing message {MessageId}.",
-                message.MessageId);
+                "Unhandled failure while processing message {MessageId} " +
+                "with CorrelationId {CorrelationId}.",
+                message.MessageId,
+                correlationId);
+
+            activity?.SetTag(
+                "reorder.outcome",
+                "unhandled-failure");
+
+            activity?.SetTag(
+                "error.type",
+                ex.GetType().FullName);
+
+            activity?.SetStatus(
+                ActivityStatusCode.Error,
+                ex.Message);
 
             await SettleFailedMessageAsync(
                 receiver,
                 message,
                 ex.GetBaseException().Message,
+                correlationId,
                 cancellationToken);
 
             return;
@@ -171,33 +262,66 @@ public class Worker : BackgroundService
         switch (result.Outcome)
         {
             case ReorderProcessingOutcome.Processed:
+                activity?.SetTag(
+                    "reorder.outcome",
+                    "processed");
+
+                activity?.SetTag(
+                    "messaging.settlement",
+                    "completed");
+
+                activity?.SetStatus(ActivityStatusCode.Ok);
+
                 await receiver.CompleteMessageAsync(
                     message,
                     cancellationToken);
 
                 _logger.LogInformation(
-                    "Completed processed message {MessageId}.",
-                    message.MessageId);
+                    "Completed processed message {MessageId} with " +
+                    "CorrelationId {CorrelationId}.",
+                    message.MessageId,
+                    correlationId);
 
                 break;
 
             case ReorderProcessingOutcome.DuplicateSkipped:
+                activity?.SetTag(
+                    "reorder.outcome",
+                    "duplicate-skipped");
+
+                activity?.SetTag(
+                    "messaging.settlement",
+                    "completed");
+
+                activity?.SetStatus(ActivityStatusCode.Ok);
+
                 await receiver.CompleteMessageAsync(
                     message,
                     cancellationToken);
 
                 _logger.LogInformation(
-                    "Completed duplicate message {MessageId} " +
-                    "without repeating business processing.",
-                    message.MessageId);
+                    "Completed duplicate message {MessageId} with " +
+                    "CorrelationId {CorrelationId} without repeating " +
+                    "business processing.",
+                    message.MessageId,
+                    correlationId);
 
                 break;
 
             case ReorderProcessingOutcome.Failed:
+                activity?.SetTag(
+                    "reorder.outcome",
+                    "failed");
+
+                activity?.SetStatus(
+                    ActivityStatusCode.Error,
+                    result.Reason);
+
                 await SettleFailedMessageAsync(
                     receiver,
                     message,
                     result.Reason ?? "Reorder processing failed.",
+                    correlationId,
                     cancellationToken);
 
                 break;
@@ -208,10 +332,77 @@ public class Worker : BackgroundService
         }
     }
 
+    private static string GetCorrelationId(
+        ServiceBusReceivedMessage message)
+    {
+        if (!string.IsNullOrWhiteSpace(message.CorrelationId))
+        {
+            return message.CorrelationId;
+        }
+
+        if (message.ApplicationProperties.TryGetValue(
+                "CorrelationId",
+                out var correlationValue))
+        {
+            var correlationId = correlationValue?.ToString();
+
+            if (!string.IsNullOrWhiteSpace(correlationId))
+            {
+                return correlationId;
+            }
+        }
+
+        return Guid.NewGuid().ToString("N");
+    }
+
+    private static Activity? StartProcessingActivity(
+        ServiceBusReceivedMessage message)
+    {
+        var traceParent =
+            GetApplicationProperty(message, "traceparent");
+
+        var traceState =
+            GetApplicationProperty(message, "tracestate");
+
+        if (!string.IsNullOrWhiteSpace(traceParent) &&
+            ActivityContext.TryParse(
+                traceParent,
+                traceState,
+                isRemote: true,
+                out var parentContext))
+        {
+            return InventoryObservability.ActivitySource
+                .StartActivity(
+                    "ProcessReorderMessage",
+                    ActivityKind.Consumer,
+                    parentContext);
+        }
+
+        return InventoryObservability.ActivitySource
+            .StartActivity(
+                "ProcessReorderMessage",
+                ActivityKind.Consumer);
+    }
+
+    private static string? GetApplicationProperty(
+        ServiceBusReceivedMessage message,
+        string propertyName)
+    {
+        if (!message.ApplicationProperties.TryGetValue(
+                propertyName,
+                out var propertyValue))
+        {
+            return null;
+        }
+
+        return propertyValue?.ToString();
+    }
+
     private async Task SettleFailedMessageAsync(
         ServiceBusReceiver receiver,
         ServiceBusReceivedMessage message,
         string reason,
+        string correlationId,
         CancellationToken cancellationToken)
     {
         var maxDeliveryAttempts =
@@ -219,6 +410,10 @@ public class Worker : BackgroundService
 
         if (message.DeliveryCount >= maxDeliveryAttempts)
         {
+            Activity.Current?.SetTag(
+                "messaging.settlement",
+                "dead-lettered");
+
             await receiver.DeadLetterMessageAsync(
                 message,
                 deadLetterReason: "ReorderProcessingFailed",
@@ -226,24 +421,31 @@ public class Worker : BackgroundService
                 cancellationToken);
 
             _logger.LogWarning(
-                "Dead-lettered message {MessageId} after " +
-                "{DeliveryCount} delivery attempts. Reason: {Reason}",
+                "Dead-lettered message {MessageId} with CorrelationId " +
+                "{CorrelationId} after {DeliveryCount} delivery attempts. " +
+                "Reason: {Reason}",
                 message.MessageId,
+                correlationId,
                 message.DeliveryCount,
                 reason);
 
             return;
         }
 
+        Activity.Current?.SetTag(
+            "messaging.settlement",
+            "abandoned");
+
         await receiver.AbandonMessageAsync(
             message,
             cancellationToken: cancellationToken);
 
         _logger.LogWarning(
-            "Abandoned message {MessageId} after delivery attempt " +
-            "{DeliveryCount}; the message remains retryable. " +
-            "Reason: {Reason}",
+            "Abandoned message {MessageId} with CorrelationId " +
+            "{CorrelationId} after delivery attempt {DeliveryCount}; " +
+            "the message remains retryable. Reason: {Reason}",
             message.MessageId,
+            correlationId,
             message.DeliveryCount,
             reason);
     }
