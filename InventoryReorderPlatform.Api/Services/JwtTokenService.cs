@@ -30,6 +30,15 @@ public sealed class JwtTokenService : IJwtTokenService
         var roles =
             await _userManager.GetRolesAsync(user);
 
+        var securityStamp =
+            await _userManager.GetSecurityStampAsync(user);
+
+        if (string.IsNullOrWhiteSpace(securityStamp))
+        {
+            throw new InvalidOperationException(
+                "The user does not have a security stamp.");
+        }
+
         var now = DateTime.UtcNow;
 
         var expiresAtUtc =
@@ -53,7 +62,11 @@ public sealed class JwtTokenService : IJwtTokenService
                 ClaimTypes.Name,
                 user.UserName
                 ?? user.Email
-                ?? user.Id)
+                ?? user.Id),
+
+            new(
+                JwtClaimNames.SecurityStamp,
+                securityStamp)
         };
 
         if (!string.IsNullOrWhiteSpace(user.Email))

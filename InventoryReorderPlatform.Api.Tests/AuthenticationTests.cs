@@ -205,4 +205,105 @@ public sealed class AuthenticationTests
             HttpStatusCode.OK,
             protectedResponse.StatusCode);
     }
+
+    [Fact]
+    public async Task Jwt_IsRejected_WhenAccountBecomesInactive()
+    {
+        var cancellationToken =
+            TestContext.Current.CancellationToken;
+
+        var authenticated =
+            await TestAuthentication
+                .CreateAuthenticatedClientAsync(
+                    _factory,
+                    AppRoles.Viewer,
+                    cancellationToken);
+
+        using var client = authenticated.Client;
+
+        using (var scope =
+               _factory.Services.CreateScope())
+        {
+            var userManager =
+                scope.ServiceProvider
+                    .GetRequiredService<
+                        UserManager<ApplicationUser>>();
+
+            var user =
+                await userManager.FindByEmailAsync(
+                    authenticated.Email);
+
+            Assert.NotNull(user);
+
+            user.IsActive = false;
+
+            var updateResult =
+                await userManager.UpdateAsync(user);
+
+            Assert.True(
+                updateResult.Succeeded,
+                string.Join(
+                    "; ",
+                    updateResult.Errors.Select(
+                        error => error.Description)));
+        }
+
+        var response = await client.GetAsync(
+            "/api/inventoryitems",
+            cancellationToken);
+
+        Assert.Equal(
+            HttpStatusCode.Unauthorized,
+            response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Jwt_IsRejected_WhenSecurityStampChanges()
+    {
+        var cancellationToken =
+            TestContext.Current.CancellationToken;
+
+        var authenticated =
+            await TestAuthentication
+                .CreateAuthenticatedClientAsync(
+                    _factory,
+                    AppRoles.Operator,
+                    cancellationToken);
+
+        using var client = authenticated.Client;
+
+        using (var scope =
+               _factory.Services.CreateScope())
+        {
+            var userManager =
+                scope.ServiceProvider
+                    .GetRequiredService<
+                        UserManager<ApplicationUser>>();
+
+            var user =
+                await userManager.FindByEmailAsync(
+                    authenticated.Email);
+
+            Assert.NotNull(user);
+
+            var updateResult =
+                await userManager
+                    .UpdateSecurityStampAsync(user);
+
+            Assert.True(
+                updateResult.Succeeded,
+                string.Join(
+                    "; ",
+                    updateResult.Errors.Select(
+                        error => error.Description)));
+        }
+
+        var response = await client.GetAsync(
+            "/api/inventoryitems",
+            cancellationToken);
+
+        Assert.Equal(
+            HttpStatusCode.Unauthorized,
+            response.StatusCode);
+    }
 }

@@ -93,6 +93,59 @@ builder.Services
                     NameClaimType = ClaimTypes.Name,
                     RoleClaimType = ClaimTypes.Role
                 };
+
+            options.Events = new JwtBearerEvents
+            {
+                OnTokenValidated = async context =>
+                {
+                    var userId =
+                        context.Principal?.FindFirstValue(
+                            ClaimTypes.NameIdentifier);
+
+                    var tokenSecurityStamp =
+                        context.Principal?.FindFirstValue(
+                            JwtClaimNames.SecurityStamp);
+
+                    if (string.IsNullOrWhiteSpace(userId) ||
+                        string.IsNullOrWhiteSpace(
+                            tokenSecurityStamp))
+                    {
+                        context.Fail(
+                            "The access token is missing required account claims.");
+
+                        return;
+                    }
+
+                    var userManager =
+                        context.HttpContext.RequestServices
+                            .GetRequiredService<
+                                UserManager<ApplicationUser>>();
+
+                    var user =
+                        await userManager.FindByIdAsync(userId);
+
+                    if (user is null || !user.IsActive)
+                    {
+                        context.Fail(
+                            "The account is unavailable.");
+
+                        return;
+                    }
+
+                    var currentSecurityStamp =
+                        await userManager
+                            .GetSecurityStampAsync(user);
+
+                    if (!string.Equals(
+                            currentSecurityStamp,
+                            tokenSecurityStamp,
+                            StringComparison.Ordinal))
+                    {
+                        context.Fail(
+                            "The access token is no longer valid.");
+                    }
+                }
+            };
         });
 
 builder.Services.AddAuthorization(options =>
