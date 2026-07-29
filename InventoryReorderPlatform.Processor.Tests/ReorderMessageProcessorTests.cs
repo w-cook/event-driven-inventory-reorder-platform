@@ -213,6 +213,100 @@ public class ReorderMessageProcessorTests
         Assert.Empty(dbContext.ReorderEvents);
     }
 
+    [Fact]
+    public async Task ProcessAsync_AfterInitialFailure_ProcessesWhenReorderEventIsRestored()
+    {
+        var cancellationToken =
+            TestContext.Current.CancellationToken;
+
+        await using var dbContext = CreateDbContext();
+
+        var processor = new ReorderMessageProcessor(
+            dbContext,
+            NullLogger<ReorderMessageProcessor>.Instance);
+
+        var triggeredAt = DateTime.UtcNow;
+
+        var message = new ReorderRequestedMessage
+        {
+            ReorderEventId = 42,
+            InventoryItemId = 10,
+            Sku = "RECOVERY-001",
+            QuantityAtTrigger = 3,
+            TriggeredAt = triggeredAt
+        };
+
+        const string messageId = "reorder-event-42";
+        const string rawPayload = """{"reorderEventId":42}""";
+
+        var failedResult = await processor.ProcessAsync(
+            message,
+            messageId,
+            rawPayload,
+            deliveryCount: 1,
+            cancellationToken);
+
+        Assert.Equal(
+            ReorderProcessingOutcome.Failed,
+            failedResult.Outcome);
+
+        Assert.Single(
+            await dbContext.FailedMessages
+                .ToListAsync(cancellationToken));
+
+        Assert.Empty(
+            await dbContext.ProcessedMessages
+                .ToListAsync(cancellationToken));
+
+        dbContext.ReorderEvents.Add(
+            new ReorderEvent
+            {
+                Id = message.ReorderEventId,
+                InventoryItemId = message.InventoryItemId,
+                QuantityAtTrigger = message.QuantityAtTrigger,
+                TriggeredAt = message.TriggeredAt,
+                Status = "Pending"
+            });
+
+        await dbContext.SaveChangesAsync(
+            cancellationToken);
+
+        var recoveredResult = await processor.ProcessAsync(
+            message,
+            messageId,
+            rawPayload,
+            deliveryCount: 2,
+            cancellationToken);
+
+        Assert.Equal(
+            ReorderProcessingOutcome.Processed,
+            recoveredResult.Outcome);
+
+        var reorderEvent =
+            await dbContext.ReorderEvents
+                .SingleAsync(cancellationToken);
+
+        Assert.Equal(
+            "Processed",
+            reorderEvent.Status);
+
+        var processedMessage =
+            await dbContext.ProcessedMessages
+                .SingleAsync(cancellationToken);
+
+        Assert.Equal(
+            messageId,
+            processedMessage.MessageId);
+
+        var failedMessage =
+            await dbContext.FailedMessages
+                .SingleAsync(cancellationToken);
+
+        Assert.Equal(
+            1,
+            failedMessage.AttemptCount);
+    }
+
     private static AppDbContext CreateDbContext()
     {
         var options = new DbContextOptionsBuilder<AppDbContext>()
