@@ -112,6 +112,10 @@ The API also propagates W3C trace context to the Processor. Custom OpenTelemetry
 
 Aspire provides a local view of resource health, structured logs, metrics, and distributed traces. Detailed tracing and troubleshooting steps are documented in the [observability runbook](docs/observability-runbook.md).
 
+## Architecture
+
+See [System Architecture](docs/architecture.md) for the component diagram, runtime boundaries, message flow, persistence responsibilities, observability design, and intentional project limitations.
+
 ## Tech Stack
 
 - C#
