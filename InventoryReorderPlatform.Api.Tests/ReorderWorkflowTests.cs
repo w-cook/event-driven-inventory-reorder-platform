@@ -4,6 +4,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using InventoryReorderPlatform.Api.DTOs;
+using InventoryReorderPlatform.Api.Security;
 using InventoryReorderPlatform.Api.Services;
 using InventoryReorderPlatform.Data;
 using Microsoft.EntityFrameworkCore;
@@ -35,11 +36,14 @@ public sealed class ReorderWorkflowTests
 
         _factory.MessagePublisher.Clear();
 
-        using var client = _factory.CreateClient();
+        var authenticated =
+            await TestAuthentication
+                .CreateAuthenticatedClientAsync(
+                    _factory,
+                    AppRoles.Operator,
+                    cancellationToken);
 
-        client.DefaultRequestHeaders.Add(
-            "X-Demo-User",
-            "operator");
+        using var client = authenticated.Client;
 
         var request = new
         {
@@ -158,11 +162,14 @@ public sealed class ReorderWorkflowTests
 
         _factory.MessagePublisher.Clear();
 
-        using var client = _factory.CreateClient();
+        var authenticated =
+            await TestAuthentication
+                .CreateAuthenticatedClientAsync(
+                    _factory,
+                    AppRoles.Operator,
+                    cancellationToken);
 
-        client.DefaultRequestHeaders.Add(
-            "X-Demo-User",
-            "operator");
+        using var client = authenticated.Client;
 
         var request = new
         {

@@ -38,6 +38,22 @@ public sealed class InventoryApiFactory
             "ServiceBus:QueueName",
             "reorder-events");
 
+        builder.UseSetting(
+            "Jwt:Issuer",
+            "InventoryReorderPlatform.Api.Tests");
+
+        builder.UseSetting(
+            "Jwt:Audience",
+            "InventoryReorderPlatform.Api.Tests.Client");
+
+        builder.UseSetting(
+            "Jwt:SigningKey",
+            "test-only-jwt-signing-key-with-32-plus-bytes!");
+
+        builder.UseSetting(
+            "Jwt:AccessTokenMinutes",
+            "30");
+
         builder.ConfigureServices(services =>
         {
             services.RemoveAll<AppDbContext>();

@@ -18,7 +18,6 @@ builder
 builder
     .AddViteApp("client", "../client")
     .WithReference(api)
-    .WaitFor(api)
-    .WithEnvironment("VITE_DEMO_USER", "operator");
+    .WaitFor(api);
 
 builder.Build().Run();

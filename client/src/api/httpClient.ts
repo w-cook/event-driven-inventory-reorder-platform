@@ -1,18 +1,12 @@
-const configuredDemoUser = import.meta.env.VITE_DEMO_USER
-  ?.trim()
-  .toLowerCase()
+let accessToken: string | null = null
 
-const DEMO_USER = configuredDemoUser || 'operator'
+export function setAccessToken(token: string | null): void {
+  accessToken = token?.trim() || null
+}
 
-const DEMO_ROLE_LABELS = {
-  viewer: 'Viewer',
-  operator: 'Operator',
-  admin: 'Administrator',
-} as const
-
-export const DEMO_ROLE_LABEL =
-  DEMO_ROLE_LABELS[DEMO_USER as keyof typeof DEMO_ROLE_LABELS] ??
-  DEMO_USER
+export function clearAccessToken(): void {
+  accessToken = null
+}
 
 export async function apiFetch(
   input: RequestInfo | URL,
@@ -20,8 +14,11 @@ export async function apiFetch(
 ): Promise<Response> {
   const headers = new Headers(init.headers)
 
-  if (!headers.has('X-Demo-User')) {
-    headers.set('X-Demo-User', DEMO_USER)
+  if (accessToken && !headers.has('Authorization')) {
+    headers.set(
+      'Authorization',
+      `Bearer ${accessToken}`,
+    )
   }
 
   return fetch(input, {
@@ -37,7 +34,8 @@ export async function handleJsonResponse<T>(
     const responseBody = await response.text()
 
     throw new Error(
-      responseBody || `Request failed with status ${response.status}`,
+      responseBody ||
+        `Request failed with status ${response.status}`,
     )
   }
 

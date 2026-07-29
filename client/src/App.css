@@ -201,6 +201,93 @@ th {
   color: #526070;
 }
 
+.login-page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+}
+
+.login-card {
+  width: min(440px, 100%);
+  background: white;
+  border: 1px solid #dde3ee;
+  border-radius: 1rem;
+  padding: 2rem;
+  box-shadow: 0 10px 24px rgb(15 23 42 / 0.08);
+}
+
+.login-card h1,
+.login-card > p {
+  text-align: center;
+}
+
+.login-form {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.login-form label {
+  display: grid;
+  gap: 0.4rem;
+  font-weight: 600;
+}
+
+.login-form input {
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.6rem;
+  padding: 0.75rem;
+  font: inherit;
+}
+
+.login-form input:focus {
+  outline: 2px solid #2563eb;
+  outline-offset: 1px;
+}
+
+button {
+  border: 0;
+  border-radius: 0.6rem;
+  padding: 0.75rem 1rem;
+  background: #2563eb;
+  color: white;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.secondary-button {
+  background: #e2e8f0;
+  color: #172033;
+}
+
+.session-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.session-bar .eyebrow {
+  margin-bottom: 0.25rem;
+  text-align: left;
+}
+
+.session-roles {
+  margin-top: 0.25rem !important;
+  text-align: left !important;
+  color: #526070;
+  font-size: 0.9rem;
+}
+
 @media (max-width: 760px) {
   .grid,
   .summary-grid,
@@ -210,5 +297,13 @@ th {
 
   .section-header {
     display: grid;
+  }
+
+  .session-bar {
+    display: grid;
+  }
+
+  .secondary-button {
+    width: 100%;
   }
 }

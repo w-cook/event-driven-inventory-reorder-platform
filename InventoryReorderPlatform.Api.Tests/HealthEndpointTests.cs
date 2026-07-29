@@ -1,6 +1,7 @@
 ﻿using System.Net;
 using System.Net.Http.Json;
 using InventoryReorderPlatform.Api.DTOs;
+using InventoryReorderPlatform.Api.Security;
 
 namespace InventoryReorderPlatform.Api.Tests;
 
@@ -55,11 +56,14 @@ public sealed class HealthEndpointTests
         var cancellationToken =
             TestContext.Current.CancellationToken;
 
-        using var client = _factory.CreateClient();
+        var authenticated =
+            await TestAuthentication
+                .CreateAuthenticatedClientAsync(
+                    _factory,
+                    AppRoles.Viewer,
+                    cancellationToken);
 
-        client.DefaultRequestHeaders.Add(
-            "X-Demo-User",
-            "viewer");
+        using var client = authenticated.Client;
 
         var response = await client.GetAsync(
             "/api/operations/health",
