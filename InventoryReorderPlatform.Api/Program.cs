@@ -84,7 +84,9 @@ builder.Services.AddSingleton(sp =>
     return new ServiceBusClient(options.ConnectionString);
 });
 
-builder.Services.AddSingleton<ReorderMessagePublisher>();
+builder.Services.AddSingleton<
+    IReorderMessagePublisher,
+    ReorderMessagePublisher>();
 
 var app = builder.Build();
 
@@ -93,7 +95,14 @@ using (var scope = app.Services.CreateScope())
     var dbContext =
         scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-    dbContext.Database.Migrate();
+    if (dbContext.Database.IsRelational())
+    {
+        dbContext.Database.Migrate();
+    }
+    else
+    {
+        dbContext.Database.EnsureCreated();
+    }
 }
 
 app.UseMiddleware<CorrelationIdMiddleware>();
@@ -105,3 +114,7 @@ app.MapDefaultEndpoints();
 app.MapControllers();
 
 app.Run();
+
+public partial class Program
+{
+}

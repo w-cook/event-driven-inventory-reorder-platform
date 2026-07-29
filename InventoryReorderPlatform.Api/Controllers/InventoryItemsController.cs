@@ -15,13 +15,13 @@ namespace InventoryReorderPlatform.Api.Controllers
     public class InventoryItemsController : ControllerBase
     {
         private readonly AppDbContext _dbContext;
-        private readonly ReorderMessagePublisher _reorderMessagePublisher;
+        private readonly IReorderMessagePublisher _reorderMessagePublisher;
         private readonly IAuditService _auditService;
         private readonly ILogger<InventoryItemsController> _logger;
 
         public InventoryItemsController(
             AppDbContext dbContext,
-            ReorderMessagePublisher reorderMessagePublisher,
+            IReorderMessagePublisher reorderMessagePublisher,
             IAuditService auditService,
             ILogger<InventoryItemsController> logger)
         {

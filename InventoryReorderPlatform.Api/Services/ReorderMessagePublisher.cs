@@ -9,6 +9,7 @@ using Microsoft.Extensions.Options;
 namespace InventoryReorderPlatform.Api.Services
 {
     public class ReorderMessagePublisher
+        : IReorderMessagePublisher
     {
         private readonly ServiceBusClient _serviceBusClient;
         private readonly ServiceBusOptions _options;
