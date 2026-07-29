@@ -39,7 +39,7 @@ export function SystemHealthPanel({
   onRefresh,
 }: Props) {
   return (
-    <section className="card">
+    <section className="card system-health-panel">
       <div className="section-header">
         <h2>System Health</h2>
 

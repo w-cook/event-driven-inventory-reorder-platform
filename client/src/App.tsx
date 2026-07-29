@@ -8,6 +8,7 @@ import {
 import { listInventoryItems } from './api/inventoryItems'
 import { listReorderEvents } from './api/reorderEvents'
 import { getSystemHealth } from './api/systemHealth'
+import { AccountManagementPanel } from './components/AccountManagementPanel'
 import { InventorySummaryCards } from './components/InventorySummaryCards'
 import { InventoryTable } from './components/InventoryTable'
 import { LoginForm } from './components/LoginForm'
@@ -125,6 +126,9 @@ function App() {
     )
   }
 
+  const isAdministrator =
+    session.roles.includes('Administrator')
+
   return (
     <main className="page">
       <header className="hero">
@@ -191,6 +195,10 @@ function App() {
           onRefresh={loadSystemHealth}
         />
       </section>
+
+      {isAdministrator && (
+        <AccountManagementPanel />
+      )}
     </main>
   )
 }
