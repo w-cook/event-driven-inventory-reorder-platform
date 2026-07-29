@@ -6,6 +6,7 @@ using InventoryReorderPlatform.Data.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace InventoryReorderPlatform.Api.Controllers;
 
@@ -26,6 +27,42 @@ public sealed class AccountsController : ControllerBase
         _userManager = userManager;
         _dbContext = dbContext;
         _auditService = auditService;
+    }
+
+    [HttpGet]
+    public async Task<ActionResult<IReadOnlyList<AccountResponse>>> GetAll(
+        CancellationToken cancellationToken)
+    {
+        var users =
+            await _userManager.Users
+                .AsNoTracking()
+                .OrderBy(user => user.Email)
+                .ThenBy(user => user.Id)
+                .ToListAsync(cancellationToken);
+
+        var accounts =
+            new List<AccountResponse>(
+                users.Count);
+
+        foreach (var user in users)
+        {
+            var roles =
+                await _userManager.GetRolesAsync(user);
+
+            accounts.Add(
+                new AccountResponse(
+                    user.Id,
+                    user.Email
+                        ?? user.UserName
+                        ?? user.Id,
+                    roles
+                        .OrderBy(role => role)
+                        .ToArray(),
+                    user.IsActive,
+                    user.CreatedAtUtc));
+        }
+
+        return Ok(accounts);
     }
 
     [HttpPost]

@@ -1253,6 +1253,152 @@ public sealed class AccountManagementTests
         }
     }
 
+    [Fact]
+    public async Task GetAccounts_AsOperator_ReturnsForbidden()
+    {
+        var cancellationToken =
+            TestContext.Current.CancellationToken;
+
+        var authenticated =
+            await TestAuthentication
+                .CreateAuthenticatedClientAsync(
+                    _factory,
+                    AppRoles.Operator,
+                    cancellationToken);
+
+        using var client =
+            authenticated.Client;
+
+        var response =
+            await client.GetAsync(
+                "/api/accounts",
+                cancellationToken);
+
+        Assert.Equal(
+            HttpStatusCode.Forbidden,
+            response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetAccounts_AsAdministrator_ReturnsAccountRolesAndStatuses()
+    {
+        var cancellationToken =
+            TestContext.Current.CancellationToken;
+
+        var administrator =
+            await TestAuthentication
+                .CreateAuthenticatedClientAsync(
+                    _factory,
+                    AppRoles.Administrator,
+                    cancellationToken);
+
+        using var client =
+            administrator.Client;
+
+        var viewerEmail =
+            $"listed-viewer-{Guid.NewGuid():N}@test.local";
+
+        var operatorEmail =
+            $"listed-operator-{Guid.NewGuid():N}@test.local";
+
+        var viewerAccount =
+            await CreateAccountAsync(
+                client,
+                viewerEmail,
+                AppRoles.Viewer,
+                cancellationToken);
+
+        var operatorAccount =
+            await CreateAccountAsync(
+                client,
+                operatorEmail,
+                AppRoles.Operator,
+                cancellationToken);
+
+        var deactivateResponse =
+            await client.PatchAsJsonAsync(
+                $"/api/accounts/{operatorAccount.Id}/status",
+                new UpdateAccountStatusRequest
+                {
+                    IsActive = false
+                },
+                cancellationToken);
+
+        Assert.Equal(
+            HttpStatusCode.OK,
+            deactivateResponse.StatusCode);
+
+        var response =
+            await client.GetAsync(
+                "/api/accounts",
+                cancellationToken);
+
+        Assert.Equal(
+            HttpStatusCode.OK,
+            response.StatusCode);
+
+        var accounts =
+            await response.Content
+                .ReadFromJsonAsync<
+                    List<AccountResponse>>(
+                        cancellationToken:
+                            cancellationToken);
+
+        Assert.NotNull(accounts);
+
+        var listedAdministrator =
+            Assert.Single(
+                accounts,
+                account =>
+                    account.Email ==
+                    administrator.Email);
+
+        Assert.True(
+            listedAdministrator.IsActive);
+
+        Assert.Contains(
+            AppRoles.Administrator,
+            listedAdministrator.Roles);
+
+        var listedViewer =
+            Assert.Single(
+                accounts,
+                account =>
+                    account.Id ==
+                    viewerAccount.Id);
+
+        Assert.Equal(
+            viewerEmail,
+            listedViewer.Email);
+
+        Assert.True(
+            listedViewer.IsActive);
+
+        Assert.Equal(
+            AppRoles.Viewer,
+            Assert.Single(
+                listedViewer.Roles));
+
+        var listedOperator =
+            Assert.Single(
+                accounts,
+                account =>
+                    account.Id ==
+                    operatorAccount.Id);
+
+        Assert.Equal(
+            operatorEmail,
+            listedOperator.Email);
+
+        Assert.False(
+            listedOperator.IsActive);
+
+        Assert.Equal(
+            AppRoles.Operator,
+            Assert.Single(
+                listedOperator.Roles));
+    }
+
     private static void AssertIdentitySucceeded(
         IdentityResult result,
         string operation)
