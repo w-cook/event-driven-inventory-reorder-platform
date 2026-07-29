@@ -1,20 +1,28 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import './App.css'
 
+import {
+  clearAccessToken,
+  setAccessToken,
+} from './api/httpClient'
 import { listInventoryItems } from './api/inventoryItems'
 import { listReorderEvents } from './api/reorderEvents'
 import { getSystemHealth } from './api/systemHealth'
-import { DEMO_ROLE_LABEL } from './api/httpClient'
+import { AccountManagementPanel } from './components/AccountManagementPanel'
 import { InventorySummaryCards } from './components/InventorySummaryCards'
 import { InventoryTable } from './components/InventoryTable'
+import { LoginForm } from './components/LoginForm'
 import { ReorderWorkflowPanel } from './components/ReorderWorkflowPanel'
 import { SystemHealthPanel } from './components/SystemHealthPanel'
 import { WorkflowSummaryCards } from './components/WorkflowSummaryCards'
 import { isLowStock, type InventoryItem } from './types/inventoryItem'
+import type { LoginResponse } from './types/auth'
 import type { ReorderEvent } from './types/reorderEvent'
 import type { SystemHealth } from './types/systemHealth'
 
 function App() {
+  const [session, setSession] = useState<LoginResponse | null>(null)
+
   const [items, setItems] = useState<InventoryItem[]>([])
   const [reorderEvents, setReorderEvents] = useState<ReorderEvent[]>([])
   const [showLowStockOnly, setShowLowStockOnly] = useState(false)
@@ -51,38 +59,100 @@ function App() {
     }
   }, [])
 
-  useEffect(() => {
-    async function loadDashboardData() {
-      setIsLoading(true)
-      setErrorMessage('')
+  const loadDashboardData = useCallback(async () => {
+    setIsLoading(true)
+    setErrorMessage('')
 
-      try {
-        const [loadedItems, loadedReorderEvents] = await Promise.all([
+    try {
+      const [loadedItems, loadedReorderEvents] =
+        await Promise.all([
           listInventoryItems(),
           listReorderEvents(),
         ])
 
-        setItems(loadedItems)
-        setReorderEvents(loadedReorderEvents)
-      } catch (error) {
-        setErrorMessage(
-          error instanceof Error
-            ? error.message
-            : 'Unable to load dashboard data.',
-        )
-      } finally {
-        setIsLoading(false)
-      }
+      setItems(loadedItems)
+      setReorderEvents(loadedReorderEvents)
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : 'Unable to load dashboard data.',
+      )
+    } finally {
+      setIsLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!session) {
+      return
     }
 
     void loadDashboardData()
     void loadSystemHealth()
-  }, [loadSystemHealth])
+  }, [
+    session,
+    loadDashboardData,
+    loadSystemHealth,
+  ])
+
+  function handleAuthenticated(
+    authenticatedSession: LoginResponse,
+  ) {
+    setAccessToken(
+      authenticatedSession.accessToken,
+    )
+
+    setSession(authenticatedSession)
+  }
+
+  function handleLogout() {
+    clearAccessToken()
+    setSession(null)
+
+    setItems([])
+    setReorderEvents([])
+    setSystemHealth(null)
+
+    setErrorMessage('')
+    setHealthErrorMessage('')
+  }
+
+  if (!session) {
+    return (
+      <LoginForm
+        onAuthenticated={handleAuthenticated}
+      />
+    )
+  }
+
+  const isAdministrator =
+    session.roles.includes('Administrator')
 
   return (
     <main className="page">
       <header className="hero">
-        <p className="eyebrow">Demo role: {DEMO_ROLE_LABEL}</p>
+        <div className="session-bar">
+          <div>
+            <p className="eyebrow">
+              Signed in as
+            </p>
+
+            <strong>{session.email}</strong>
+
+            <p className="session-roles">
+              {session.roles.join(', ')}
+            </p>
+          </div>
+
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={handleLogout}
+          >
+            Sign out
+          </button>
+        </div>
 
         <h1>Inventory Operations Dashboard</h1>
         
@@ -125,6 +195,12 @@ function App() {
           onRefresh={loadSystemHealth}
         />
       </section>
+
+      {isAdministrator && (
+        <AccountManagementPanel
+          currentUserEmail={session.email}
+        />
+      )}
     </main>
   )
 }

@@ -1,11 +1,16 @@
+using System.Security.Claims;
+using System.Text;
 using Azure.Messaging.ServiceBus;
 using InventoryReorderPlatform.Api.Middleware;
 using InventoryReorderPlatform.Api.Security;
 using InventoryReorderPlatform.Api.Services;
 using InventoryReorderPlatform.Contracts.Configuration;
 using InventoryReorderPlatform.Data;
-using Microsoft.AspNetCore.Authentication;
+using InventoryReorderPlatform.Data.Models;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -15,6 +20,33 @@ builder.AddSqlServerDbContext<AppDbContext>(
     connectionName: "inventorydb");
 
 // Add services to the container.
+builder.Services
+    .AddIdentityCore<ApplicationUser>(options =>
+    {
+        options.User.RequireUniqueEmail = true;
+
+        options.Password.RequiredLength = 10;
+        options.Password.RequireDigit = true;
+        options.Password.RequireLowercase = true;
+        options.Password.RequireUppercase = true;
+        options.Password.RequireNonAlphanumeric = true;
+
+        options.Lockout.AllowedForNewUsers = true;
+        options.Lockout.MaxFailedAccessAttempts = 5;
+        options.Lockout.DefaultLockoutTimeSpan =
+            TimeSpan.FromMinutes(15);
+    })
+    .AddRoles<IdentityRole>()
+    .AddEntityFrameworkStores<AppDbContext>();
+
+builder.Services.Configure<JwtOptions>(
+    builder.Configuration.GetSection(
+        JwtOptions.SectionName));
+
+builder.Services.AddScoped<
+    IJwtTokenService,
+    JwtTokenService>();
+
 builder.Services.AddControllers();
 
 builder.Services.AddHttpContextAccessor();
@@ -25,20 +57,96 @@ builder.Services.AddSingleton<
 
 builder.Services.AddScoped<IAuditService, AuditService>();
 
-builder.Services
-    .AddAuthentication(options =>
-    {
-        options.DefaultAuthenticateScheme =
-            DemoAuthenticationDefaults.Scheme;
+builder.Services.AddScoped<IdentityBootstrapper>();
 
-        options.DefaultChallengeScheme =
-            DemoAuthenticationDefaults.Scheme;
-    })
-    .AddScheme<
-        AuthenticationSchemeOptions,
-        DemoAuthenticationHandler>(
-        DemoAuthenticationDefaults.Scheme,
-        _ => { });
+var jwtOptions = builder.Configuration
+    .GetSection(JwtOptions.SectionName)
+    .Get<JwtOptions>()
+    ?? throw new InvalidOperationException(
+        "JWT configuration is missing.");
+
+builder.Services
+    .AddAuthentication(
+        JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(
+        JwtBearerDefaults.AuthenticationScheme,
+        options =>
+        {
+            options.TokenValidationParameters =
+                new TokenValidationParameters
+                {
+                    ValidateIssuer = true,
+                    ValidIssuer = jwtOptions.Issuer,
+
+                    ValidateAudience = true,
+                    ValidAudience = jwtOptions.Audience,
+
+                    ValidateIssuerSigningKey = true,
+                    IssuerSigningKey =
+                        new SymmetricSecurityKey(
+                            Encoding.UTF8.GetBytes(
+                                jwtOptions.SigningKey)),
+
+                    ValidateLifetime = true,
+                    ClockSkew = TimeSpan.FromSeconds(30),
+
+                    NameClaimType = ClaimTypes.Name,
+                    RoleClaimType = ClaimTypes.Role
+                };
+
+            options.Events = new JwtBearerEvents
+            {
+                OnTokenValidated = async context =>
+                {
+                    var userId =
+                        context.Principal?.FindFirstValue(
+                            ClaimTypes.NameIdentifier);
+
+                    var tokenSecurityStamp =
+                        context.Principal?.FindFirstValue(
+                            JwtClaimNames.SecurityStamp);
+
+                    if (string.IsNullOrWhiteSpace(userId) ||
+                        string.IsNullOrWhiteSpace(
+                            tokenSecurityStamp))
+                    {
+                        context.Fail(
+                            "The access token is missing required account claims.");
+
+                        return;
+                    }
+
+                    var userManager =
+                        context.HttpContext.RequestServices
+                            .GetRequiredService<
+                                UserManager<ApplicationUser>>();
+
+                    var user =
+                        await userManager.FindByIdAsync(userId);
+
+                    if (user is null || !user.IsActive)
+                    {
+                        context.Fail(
+                            "The account is unavailable.");
+
+                        return;
+                    }
+
+                    var currentSecurityStamp =
+                        await userManager
+                            .GetSecurityStampAsync(user);
+
+                    if (!string.Equals(
+                            currentSecurityStamp,
+                            tokenSecurityStamp,
+                            StringComparison.Ordinal))
+                    {
+                        context.Fail(
+                            "The access token is no longer valid.");
+                    }
+                }
+            };
+        });
 
 builder.Services.AddAuthorization(options =>
 {
@@ -103,6 +211,12 @@ using (var scope = app.Services.CreateScope())
     {
         dbContext.Database.EnsureCreated();
     }
+
+    var identityBootstrapper =
+    scope.ServiceProvider
+        .GetRequiredService<IdentityBootstrapper>();
+
+    await identityBootstrapper.InitializeAsync();
 }
 
 app.UseMiddleware<CorrelationIdMiddleware>();

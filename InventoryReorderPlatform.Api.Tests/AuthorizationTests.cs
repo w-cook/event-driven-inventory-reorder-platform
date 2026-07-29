@@ -43,11 +43,14 @@ public sealed class AuthorizationTests
         var cancellationToken =
             TestContext.Current.CancellationToken;
 
-        using var client = _factory.CreateClient();
+        var authenticated =
+            await TestAuthentication
+                .CreateAuthenticatedClientAsync(
+                    _factory,
+                    AppRoles.Viewer,
+                    cancellationToken);
 
-        client.DefaultRequestHeaders.Add(
-            "X-Demo-User",
-            "viewer");
+        using var client = authenticated.Client;
 
         var response = await client.GetAsync(
             "/api/inventoryitems",
@@ -64,11 +67,14 @@ public sealed class AuthorizationTests
         var cancellationToken =
             TestContext.Current.CancellationToken;
 
-        using var client = _factory.CreateClient();
+        var authenticated =
+            await TestAuthentication
+                .CreateAuthenticatedClientAsync(
+                    _factory,
+                    AppRoles.Viewer,
+                    cancellationToken);
 
-        client.DefaultRequestHeaders.Add(
-            "X-Demo-User",
-            "viewer");
+        using var client = authenticated.Client;
 
         var request = new
         {
@@ -94,11 +100,14 @@ public sealed class AuthorizationTests
         var cancellationToken =
             TestContext.Current.CancellationToken;
 
-        using var client = _factory.CreateClient();
+        var authenticated =
+            await TestAuthentication
+                .CreateAuthenticatedClientAsync(
+                    _factory,
+                    AppRoles.Operator,
+                    cancellationToken);
 
-        client.DefaultRequestHeaders.Add(
-            "X-Demo-User",
-            "operator");
+        using var client = authenticated.Client;
 
         var response = await client.GetAsync(
             "/api/audit-records",
@@ -115,11 +124,14 @@ public sealed class AuthorizationTests
         var cancellationToken =
             TestContext.Current.CancellationToken;
 
-        using var client = _factory.CreateClient();
+        var authenticated =
+            await TestAuthentication
+                .CreateAuthenticatedClientAsync(
+                    _factory,
+                    AppRoles.Operator,
+                    cancellationToken);
 
-        client.DefaultRequestHeaders.Add(
-            "X-Demo-User",
-            "operator");
+        using var client = authenticated.Client;
 
         var createRequest = new
         {
@@ -189,7 +201,7 @@ public sealed class AuthorizationTests
                     cancellationToken);
 
         Assert.Equal(
-            "operator@example.local",
+            authenticated.Email,
             auditRecord.UserName);
 
         Assert.Equal(

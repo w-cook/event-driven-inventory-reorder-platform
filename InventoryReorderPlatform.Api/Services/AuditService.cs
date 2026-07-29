@@ -23,8 +23,10 @@ namespace InventoryReorderPlatform.Api.Services
             CancellationToken cancellationToken = default)
         {
             var userName =
-                user.FindFirst(ClaimTypes.NameIdentifier)?.Value
-                ?? user.Identity?.Name
+                user.Identity?.Name
+                ?? user.FindFirst(ClaimTypes.Name)?.Value
+                ?? user.FindFirst(ClaimTypes.Email)?.Value
+                ?? user.FindFirst(ClaimTypes.NameIdentifier)?.Value
                 ?? "Unknown";
 
             var role =

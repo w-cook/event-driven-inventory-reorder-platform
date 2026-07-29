@@ -1,18 +1,12 @@
-const configuredDemoUser = import.meta.env.VITE_DEMO_USER
-  ?.trim()
-  .toLowerCase()
+let accessToken: string | null = null
 
-const DEMO_USER = configuredDemoUser || 'operator'
+export function setAccessToken(token: string | null): void {
+  accessToken = token?.trim() || null
+}
 
-const DEMO_ROLE_LABELS = {
-  viewer: 'Viewer',
-  operator: 'Operator',
-  admin: 'Administrator',
-} as const
-
-export const DEMO_ROLE_LABEL =
-  DEMO_ROLE_LABELS[DEMO_USER as keyof typeof DEMO_ROLE_LABELS] ??
-  DEMO_USER
+export function clearAccessToken(): void {
+  accessToken = null
+}
 
 export async function apiFetch(
   input: RequestInfo | URL,
@@ -20,8 +14,11 @@ export async function apiFetch(
 ): Promise<Response> {
   const headers = new Headers(init.headers)
 
-  if (!headers.has('X-Demo-User')) {
-    headers.set('X-Demo-User', DEMO_USER)
+  if (accessToken && !headers.has('Authorization')) {
+    headers.set(
+      'Authorization',
+      `Bearer ${accessToken}`,
+    )
   }
 
   return fetch(input, {
@@ -30,16 +27,60 @@ export async function apiFetch(
   })
 }
 
+interface ApiProblemDetails {
+  title?: string
+  detail?: string
+  errors?: Record<string, string[]>
+}
+
 export async function handleJsonResponse<T>(
   response: Response,
 ): Promise<T> {
-  if (!response.ok) {
-    const responseBody = await response.text()
+  const responseBody = await response.text()
 
+  if (!response.ok) {
     throw new Error(
-      responseBody || `Request failed with status ${response.status}`,
+      getApiErrorMessage(
+        responseBody,
+        response.status,
+      ),
     )
   }
 
-  return response.json() as Promise<T>
+  if (!responseBody) {
+    throw new Error(
+      'The server returned an empty response.',
+    )
+  }
+
+  return JSON.parse(responseBody) as T
+}
+
+function getApiErrorMessage(
+  responseBody: string,
+  status: number,
+): string {
+  if (!responseBody) {
+    return `Request failed with status ${status}.`
+  }
+
+  try {
+    const problem =
+      JSON.parse(responseBody) as ApiProblemDetails
+
+    const validationMessages =
+      Object.values(problem.errors ?? {}).flat()
+
+    if (validationMessages.length > 0) {
+      return validationMessages.join(' ')
+    }
+
+    return (
+      problem.detail ??
+      problem.title ??
+      `Request failed with status ${status}.`
+    )
+  } catch {
+    return responseBody
+  }
 }

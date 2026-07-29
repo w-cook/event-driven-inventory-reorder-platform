@@ -70,19 +70,23 @@ This expansion focuses on production-readiness concerns that commonly appear in 
 
 ### Phase 6 — User Accounts and JWT Authentication
 
-- [ ] persistent application-user accounts
-- [ ] securely hashed passwords using established ASP.NET Core identity components
-- [ ] login endpoint that issues signed JWT access tokens
-- [ ] replace `X-Demo-User` authentication with JWT bearer authentication
-- [ ] bootstrap the initial Administrator through environment-based configuration
-- [ ] prevent public or anonymous account registration
-- [ ] Administrator-only account creation
-- [ ] Administrator-only role assignment and changes
-- [ ] Administrator-only account deletion or deactivation
-- [ ] safeguards against removing or demoting the final Administrator
-- [ ] audit records for account and role-management actions
-- [ ] authentication and account-management integration tests
-- [ ] Swagger/OpenAPI bearer-token configuration
+- [x] persistent ASP.NET Core Identity application-user accounts
+- [x] securely hashed passwords using established ASP.NET Core Identity components
+- [x] login endpoint that issues signed JWT access tokens
+- [x] replace `X-Demo-User` authentication with JWT bearer authentication
+- [x] bootstrap the initial Administrator through environment-based configuration
+- [x] prevent public or anonymous account registration
+- [x] Administrator-only account listing and creation
+- [x] Administrator-only role assignment and changes
+- [x] Administrator-only account deactivation and reactivation
+- [x] safeguards against deactivating or demoting the final active Administrator
+- [x] immediate token invalidation after account role or status changes
+- [x] audit records for account and role-management actions
+- [x] authentication and account-management integration tests
+- [x] frontend login and logout using in-memory JWT access tokens
+- [x] Administrator account-management interface
+- [x] update the structured `.http` verification workflow for real JWT authentication
+
 
 ### Phase 7 — Reorder Quantity and Inventory Configuration
 
@@ -99,18 +103,21 @@ This expansion focuses on production-readiness concerns that commonly appear in 
 
 ### Phase 8 — Privileged Operations and Administration UI
 
-- [ ] frontend login and logout workflow
-- [ ] authenticated API client using JWT bearer tokens
-- [ ] role-aware navigation and action visibility
+Several authentication and account-administration interface items originally planned for this phase were completed early as part of Phase 6 and are marked accordingly below.
+
+- [x] frontend login and logout workflow
+- [x] authenticated API client using JWT bearer tokens
+- [x] role-aware navigation and action visibility
 - [ ] Operator and Administrator inventory quantity updates
 - [ ] inventory create and edit forms
 - [ ] validation and API error handling for inventory mutations
 - [ ] Administrator audit-record view
-- [ ] Administrator user-account management view
-- [ ] account creation, role management, and account deletion controls
-- [ ] clear handling of unauthorized and forbidden responses
-- [ ] refresh affected dashboard data after successful mutations
+- [x] Administrator user-account management view
+- [x] account creation, role management, and account activation controls
+- [ ] clear handling of expired, unauthorized, and forbidden sessions
+- [ ] refresh affected dashboard data after successful inventory mutations
 - [ ] frontend tests for role-aware behavior where practical
+
 
 ### Phase 9 — Frontend Information Architecture and UX Polish
 
