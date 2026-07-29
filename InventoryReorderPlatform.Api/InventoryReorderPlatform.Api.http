@@ -1,8 +1,11 @@
 # Aspire HostAddress
-# @InventoryReorderPlatform.Api_HostAddress=https://localhost:7025
+@InventoryReorderPlatform.Api_HostAddress=https://localhost:7025
 
 # Docker HostAddress
-@InventoryReorderPlatform.Api_HostAddress=http://localhost:8080
+# @InventoryReorderPlatform.Api_HostAddress=http://localhost:8080
+
+@viewerEmail=viewer.http@example.local
+@operatorEmail=operator.http@example.local
 
 @activeItemId=1
 @lowStockItemId=2
@@ -19,10 +22,12 @@
 // - The Service Bus emulator is ready.
 // - Requests are executed from top to bottom.
 //
-// Demo identities:
-// - viewer: read-only access
-// - operator: read access plus inventory creation and updates
-// - admin: read access plus inventory creation and updates
+// Authentication:
+// - Run the named Administrator login request first.
+// - Create the Viewer and Operator test accounts.
+// - Run the named Viewer and Operator login requests.
+// - Later requests reuse the returned JWT access tokens.
+// - Credentials are resolved from ASP.NET Core User Secrets.
 //
 //
 // Observability verification:
@@ -32,6 +37,123 @@
 // PublishReorderMessage and ProcessReorderMessage.
 //
 // See docs/observability-runbook.md for the complete debugging procedure.
+
+
+// ==========================================================================
+// 0. AUTHENTICATION AND TEST ACCOUNT SETUP
+// ==========================================================================
+
+// Bootstrap Administrator login
+//
+// Execute this request before any request that uses adminLogin.
+//
+// Expected:
+// - 200 OK
+// - roles contains Administrator
+// - accessToken is returned
+
+# @name adminLogin
+POST {{InventoryReorderPlatform.Api_HostAddress}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{AdminEmail}}",
+  "password": "{{AdminPassword}}"
+}
+
+###
+
+// Confirm the audit trail is empty before creating test accounts
+//
+// Expected:
+// - 200 OK
+// - [] when beginning with a clean database
+
+GET {{InventoryReorderPlatform.Api_HostAddress}}/api/audit-records
+Accept: application/json
+Authorization: Bearer {{adminLogin.response.body.$.accessToken}}
+
+###
+
+// Create the manual Viewer account
+//
+// Expected on a clean database:
+// - 201 Created
+// - role: Viewer
+// - isActive: true
+
+POST {{InventoryReorderPlatform.Api_HostAddress}}/api/accounts
+Content-Type: application/json
+Authorization: Bearer {{adminLogin.response.body.$.accessToken}}
+
+{
+  "email": "{{viewerEmail}}",
+  "password": "{{ManualAccountPassword}}",
+  "role": "Viewer"
+}
+
+###
+
+// Create the manual Operator account
+//
+// Expected on a clean database:
+// - 201 Created
+// - role: Operator
+// - isActive: true
+
+POST {{InventoryReorderPlatform.Api_HostAddress}}/api/accounts
+Content-Type: application/json
+Authorization: Bearer {{adminLogin.response.body.$.accessToken}}
+
+{
+  "email": "{{operatorEmail}}",
+  "password": "{{ManualAccountPassword}}",
+  "role": "Operator"
+}
+
+###
+
+// Viewer login
+//
+// Execute after creating the Viewer account.
+
+# @name viewerLogin
+POST {{InventoryReorderPlatform.Api_HostAddress}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{viewerEmail}}",
+  "password": "{{ManualAccountPassword}}"
+}
+
+###
+
+// Operator login
+//
+// Execute after creating the Operator account.
+
+# @name operatorLogin
+POST {{InventoryReorderPlatform.Api_HostAddress}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{operatorEmail}}",
+  "password": "{{ManualAccountPassword}}"
+}
+
+###
+
+// Confirm account creation audit records
+//
+// Expected:
+// - 200 OK
+// - Two UserAccountCreated records
+
+GET {{InventoryReorderPlatform.Api_HostAddress}}/api/audit-records
+Accept: application/json
+Authorization: Bearer {{adminLogin.response.body.$.accessToken}}
+
+###
 
 
 // ==========================================================================
@@ -46,12 +168,12 @@ Accept: application/json
 
 ###
 
-// Invalid demo identity
+// Invalid bearer token
 // Expected: 401 Unauthorized
 
 GET {{InventoryReorderPlatform.Api_HostAddress}}/api/inventoryitems
 Accept: application/json
-X-Demo-User: invalid-user
+Authorization: Bearer not-a-valid-jwt
 
 ###
 
@@ -60,7 +182,7 @@ X-Demo-User: invalid-user
 
 GET {{InventoryReorderPlatform.Api_HostAddress}}/api/inventoryitems
 Accept: application/json
-X-Demo-User: viewer
+Authorization: Bearer {{viewerLogin.response.body.$.accessToken}}
 
 ###
 
@@ -69,7 +191,7 @@ X-Demo-User: viewer
 
 GET {{InventoryReorderPlatform.Api_HostAddress}}/api/inventoryitems
 Accept: application/json
-X-Demo-User: operator
+Authorization: Bearer {{operatorLogin.response.body.$.accessToken}}
 
 ###
 
@@ -78,16 +200,16 @@ X-Demo-User: operator
 
 GET {{InventoryReorderPlatform.Api_HostAddress}}/api/reorderevents
 Accept: application/json
-X-Demo-User: viewer
+Authorization: Bearer {{viewerLogin.response.body.$.accessToken}}
 
 ###
 
-// Administrator confirms the audit trail is initially empty
-// Expected: 200 OK with []
+// Administrator confirms the audit trail contains 2 account creation records
+// Expected: 200 OK with 2 records
 
 GET {{InventoryReorderPlatform.Api_HostAddress}}/api/audit-records
 Accept: application/json
-X-Demo-User: admin
+Authorization: Bearer {{adminLogin.response.body.$.accessToken}}
 
 ###
 
@@ -102,7 +224,7 @@ X-Demo-User: admin
 
 GET {{InventoryReorderPlatform.Api_HostAddress}}/api/operations/health
 Accept: application/json
-X-Demo-User: viewer
+Authorization: Bearer {{viewerLogin.response.body.$.accessToken}}
 
 ###
 
@@ -121,7 +243,7 @@ Accept: application/json
 
 GET {{InventoryReorderPlatform.Api_HostAddress}}/api/audit-records
 Accept: application/json
-X-Demo-User: viewer
+Authorization: Bearer {{viewerLogin.response.body.$.accessToken}}
 
 ###
 
@@ -130,16 +252,16 @@ X-Demo-User: viewer
 
 GET {{InventoryReorderPlatform.Api_HostAddress}}/api/audit-records
 Accept: application/json
-X-Demo-User: operator
+Authorization: Bearer {{operatorLogin.response.body.$.accessToken}}
 
 ###
 
 // Administrator can inspect audit records
-// Expected: 200 OK with []
+// Expected: 200 OK with 2 records
 
 GET {{InventoryReorderPlatform.Api_HostAddress}}/api/audit-records
 Accept: application/json
-X-Demo-User: admin
+Authorization: Bearer {{adminLogin.response.body.$.accessToken}}
 
 ###
 
@@ -158,7 +280,7 @@ X-Demo-User: admin
 
 POST {{InventoryReorderPlatform.Api_HostAddress}}/api/inventoryitems
 Content-Type: application/json
-X-Demo-User: viewer
+Authorization: Bearer {{viewerLogin.response.body.$.accessToken}}
 
 {
   "name": "Unauthorized Test Item",
@@ -174,16 +296,16 @@ X-Demo-User: viewer
 
 GET {{InventoryReorderPlatform.Api_HostAddress}}/api/inventoryitems
 Accept: application/json
-X-Demo-User: viewer
+Authorization: Bearer {{viewerLogin.response.body.$.accessToken}}
 
 ###
 
 // Confirm the rejected Viewer request did not create an audit record
-// Expected: 200 OK with []
+// Expected: 200 OK with 2 records
 
 GET {{InventoryReorderPlatform.Api_HostAddress}}/api/audit-records
 Accept: application/json
-X-Demo-User: admin
+Authorization: Bearer {{adminLogin.response.body.$.accessToken}}
 
 ###
 
@@ -205,7 +327,7 @@ X-Demo-User: admin
 
 POST {{InventoryReorderPlatform.Api_HostAddress}}/api/inventoryitems
 Content-Type: application/json
-X-Demo-User: operator
+Authorization: Bearer {{operatorLogin.response.body.$.accessToken}}
 
 {
   "name": "Mechanical Keyboard",
@@ -220,14 +342,14 @@ X-Demo-User: operator
 //
 // Expected:
 // - 200 OK
-// - One InventoryItemCreated record
-// - UserName identifies the Operator
+// - One InventoryItemCreated record, 3 records total
+// - UserName should equal operator.http@example.local
 // - EntityId is "1"
 // - ReorderEventCreated is false
 
 GET {{InventoryReorderPlatform.Api_HostAddress}}/api/audit-records
 Accept: application/json
-X-Demo-User: admin
+Authorization: Bearer {{adminLogin.response.body.$.accessToken}}
 
 ###
 
@@ -249,7 +371,7 @@ X-Demo-User: admin
 
 POST {{InventoryReorderPlatform.Api_HostAddress}}/api/inventoryitems
 Content-Type: application/json
-X-Demo-User: operator
+Authorization: Bearer {{operatorLogin.response.body.$.accessToken}}
 X-Correlation-Id: {{initialReorderCorrelationId}}
 
 {
@@ -264,13 +386,13 @@ X-Correlation-Id: {{initialReorderCorrelationId}}
 // Confirm the low-stock item creation was audited
 //
 // Expected:
-// - Two total audit records
+// - Four total audit records
 // - Newest record is InventoryItemCreated for entity "2"
 // - ReorderEventCreated is true
 
 GET {{InventoryReorderPlatform.Api_HostAddress}}/api/audit-records
 Accept: application/json
-X-Demo-User: admin
+Authorization: Bearer {{adminLogin.response.body.$.accessToken}}
 
 ###
 
@@ -291,7 +413,7 @@ X-Demo-User: admin
 
 GET {{InventoryReorderPlatform.Api_HostAddress}}/api/inventoryitems
 Accept: application/json
-X-Demo-User: viewer
+Authorization: Bearer {{viewerLogin.response.body.$.accessToken}}
 
 ###
 
@@ -304,7 +426,7 @@ X-Demo-User: viewer
 
 GET {{InventoryReorderPlatform.Api_HostAddress}}/api/inventoryitems/{{activeItemId}}
 Accept: application/json
-X-Demo-User: viewer
+Authorization: Bearer {{viewerLogin.response.body.$.accessToken}}
 
 ###
 
@@ -317,7 +439,7 @@ X-Demo-User: viewer
 
 GET {{InventoryReorderPlatform.Api_HostAddress}}/api/inventoryitems/{{lowStockItemId}}
 Accept: application/json
-X-Demo-User: viewer
+Authorization: Bearer {{viewerLogin.response.body.$.accessToken}}
 
 ###
 
@@ -326,7 +448,7 @@ X-Demo-User: viewer
 
 GET {{InventoryReorderPlatform.Api_HostAddress}}/api/inventoryitems/99999
 Accept: application/json
-X-Demo-User: viewer
+Authorization: Bearer {{viewerLogin.response.body.$.accessToken}}
 
 ###
 
@@ -348,7 +470,7 @@ X-Demo-User: viewer
 
 GET {{InventoryReorderPlatform.Api_HostAddress}}/api/reorderevents
 Accept: application/json
-X-Demo-User: viewer
+Authorization: Bearer {{viewerLogin.response.body.$.accessToken}}
 
 ###
 
@@ -360,7 +482,7 @@ X-Demo-User: viewer
 
 GET {{InventoryReorderPlatform.Api_HostAddress}}/api/operations/health
 Accept: application/json
-X-Demo-User: viewer
+Authorization: Bearer {{viewerLogin.response.body.$.accessToken}}
 
 ###
 
@@ -380,7 +502,7 @@ X-Demo-User: viewer
 
 PUT {{InventoryReorderPlatform.Api_HostAddress}}/api/inventoryitems/{{activeItemId}}
 Content-Type: application/json
-X-Demo-User: viewer
+Authorization: Bearer {{viewerLogin.response.body.$.accessToken}}
 
 {
   "name": "Mechanical Keyboard",
@@ -399,7 +521,7 @@ X-Demo-User: viewer
 
 GET {{InventoryReorderPlatform.Api_HostAddress}}/api/inventoryitems/{{activeItemId}}
 Accept: application/json
-X-Demo-User: viewer
+Authorization: Bearer {{viewerLogin.response.body.$.accessToken}}
 
 ###
 
@@ -408,16 +530,16 @@ X-Demo-User: viewer
 
 GET {{InventoryReorderPlatform.Api_HostAddress}}/api/reorderevents
 Accept: application/json
-X-Demo-User: viewer
+Authorization: Bearer {{viewerLogin.response.body.$.accessToken}}
 
 ###
 
 // Confirm the rejected Viewer update did not create an audit record
-// Expected: still two total records
+// Expected: still four total records
 
 GET {{InventoryReorderPlatform.Api_HostAddress}}/api/audit-records
 Accept: application/json
-X-Demo-User: admin
+Authorization: Bearer {{adminLogin.response.body.$.accessToken}}
 
 ###
 
@@ -441,7 +563,7 @@ X-Demo-User: admin
 
 PUT {{InventoryReorderPlatform.Api_HostAddress}}/api/inventoryitems/{{activeItemId}}
 Content-Type: application/json
-X-Demo-User: operator
+Authorization: Bearer {{operatorLogin.response.body.$.accessToken}}
 X-Correlation-Id: {{transitionReorderCorrelationId}}
 
 {
@@ -461,7 +583,7 @@ X-Correlation-Id: {{transitionReorderCorrelationId}}
 
 GET {{InventoryReorderPlatform.Api_HostAddress}}/api/inventoryitems/{{activeItemId}}
 Accept: application/json
-X-Demo-User: viewer
+Authorization: Bearer {{viewerLogin.response.body.$.accessToken}}
 
 ###
 
@@ -475,7 +597,7 @@ X-Demo-User: viewer
 
 GET {{InventoryReorderPlatform.Api_HostAddress}}/api/reorderevents
 Accept: application/json
-X-Demo-User: viewer
+Authorization: Bearer {{viewerLogin.response.body.$.accessToken}}
 
 ###
 
@@ -487,14 +609,14 @@ X-Demo-User: viewer
 
 GET {{InventoryReorderPlatform.Api_HostAddress}}/api/operations/health
 Accept: application/json
-X-Demo-User: viewer
+Authorization: Bearer {{viewerLogin.response.body.$.accessToken}}
 
 ###
 
 // Confirm the low-stock transition update was audited
 //
 // Expected:
-// - Three total records
+// - Five total records
 // - Newest action is InventoryItemUpdated
 // - EntityId is "1"
 // - Previous quantity is 20
@@ -505,7 +627,7 @@ X-Demo-User: viewer
 
 GET {{InventoryReorderPlatform.Api_HostAddress}}/api/audit-records
 Accept: application/json
-X-Demo-User: admin
+Authorization: Bearer {{adminLogin.response.body.$.accessToken}}
 
 ###
 
@@ -526,7 +648,7 @@ X-Demo-User: admin
 
 PUT {{InventoryReorderPlatform.Api_HostAddress}}/api/inventoryitems/{{activeItemId}}
 Content-Type: application/json
-X-Demo-User: operator
+Authorization: Bearer {{operatorLogin.response.body.$.accessToken}}
 
 {
   "name": "Mechanical Keyboard",
@@ -545,7 +667,7 @@ X-Demo-User: operator
 
 GET {{InventoryReorderPlatform.Api_HostAddress}}/api/inventoryitems/{{activeItemId}}
 Accept: application/json
-X-Demo-User: viewer
+Authorization: Bearer {{viewerLogin.response.body.$.accessToken}}
 
 ###
 
@@ -554,7 +676,7 @@ X-Demo-User: viewer
 
 GET {{InventoryReorderPlatform.Api_HostAddress}}/api/reorderevents
 Accept: application/json
-X-Demo-User: viewer
+Authorization: Bearer {{viewerLogin.response.body.$.accessToken}}
 
 ###
 
@@ -566,21 +688,21 @@ X-Demo-User: viewer
 
 GET {{InventoryReorderPlatform.Api_HostAddress}}/api/operations/health
 Accept: application/json
-X-Demo-User: viewer
+Authorization: Bearer {{viewerLogin.response.body.$.accessToken}}
 
 ###
 
 // Confirm the repeated low-stock update was audited
 //
 // Expected:
-// - Four total records
+// - Six total records
 // - Newest action is InventoryItemUpdated
 // - Current quantity is 2
 // - ReorderEventCreated is false
 
 GET {{InventoryReorderPlatform.Api_HostAddress}}/api/audit-records
 Accept: application/json
-X-Demo-User: admin
+Authorization: Bearer {{adminLogin.response.body.$.accessToken}}
 
 ###
 
@@ -601,7 +723,7 @@ X-Demo-User: admin
 
 PUT {{InventoryReorderPlatform.Api_HostAddress}}/api/inventoryitems/{{activeItemId}}
 Content-Type: application/json
-X-Demo-User: operator
+Authorization: Bearer {{operatorLogin.response.body.$.accessToken}}
 
 {
   "name": "Mechanical Keyboard",
@@ -620,7 +742,7 @@ X-Demo-User: operator
 
 GET {{InventoryReorderPlatform.Api_HostAddress}}/api/inventoryitems/{{activeItemId}}
 Accept: application/json
-X-Demo-User: viewer
+Authorization: Bearer {{viewerLogin.response.body.$.accessToken}}
 
 ###
 
@@ -629,14 +751,14 @@ X-Demo-User: viewer
 
 GET {{InventoryReorderPlatform.Api_HostAddress}}/api/reorderevents
 Accept: application/json
-X-Demo-User: viewer
+Authorization: Bearer {{viewerLogin.response.body.$.accessToken}}
 
 ###
 
 // Confirm the restock update was audited
 //
 // Expected:
-// - Five total records
+// - Seven total records
 // - Previous status is ReorderPending
 // - Current status is Active
 // - Current quantity is 12
@@ -644,7 +766,7 @@ X-Demo-User: viewer
 
 GET {{InventoryReorderPlatform.Api_HostAddress}}/api/audit-records
 Accept: application/json
-X-Demo-User: admin
+Authorization: Bearer {{adminLogin.response.body.$.accessToken}}
 
 ###
 
@@ -660,7 +782,7 @@ X-Demo-User: admin
 
 GET {{InventoryReorderPlatform.Api_HostAddress}}/api/inventoryitems
 Accept: application/json
-X-Demo-User: admin
+Authorization: Bearer {{adminLogin.response.body.$.accessToken}}
 
 ###
 
@@ -674,7 +796,7 @@ X-Demo-User: admin
 
 PUT {{InventoryReorderPlatform.Api_HostAddress}}/api/inventoryitems/{{activeItemId}}
 Content-Type: application/json
-X-Demo-User: admin
+Authorization: Bearer {{adminLogin.response.body.$.accessToken}}
 
 {
   "name": "Mechanical Keyboard",
@@ -688,15 +810,15 @@ X-Demo-User: admin
 // Confirm the Administrator update was audited
 //
 // Expected:
-// - Six total records
+// - Eight total records
 // - Newest action is InventoryItemUpdated
-// - UserName identifies the Administrator
+// - UserName should equal admin@example.local
 // - Role is Administrator
 // - Current quantity is 15
 
 GET {{InventoryReorderPlatform.Api_HostAddress}}/api/audit-records
 Accept: application/json
-X-Demo-User: admin
+Authorization: Bearer {{adminLogin.response.body.$.accessToken}}
 
 ###
 
@@ -705,7 +827,7 @@ X-Demo-User: admin
 
 GET {{InventoryReorderPlatform.Api_HostAddress}}/api/reorderevents
 Accept: application/json
-X-Demo-User: admin
+Authorization: Bearer {{adminLogin.response.body.$.accessToken}}
 
 ###
 
@@ -717,7 +839,7 @@ X-Demo-User: admin
 
 GET {{InventoryReorderPlatform.Api_HostAddress}}/api/operations/health
 Accept: application/json
-X-Demo-User: admin
+Authorization: Bearer {{adminLogin.response.body.$.accessToken}}
 
 ###
 
@@ -736,7 +858,7 @@ X-Demo-User: admin
 
 POST {{InventoryReorderPlatform.Api_HostAddress}}/api/inventoryitems
 Content-Type: application/json
-X-Demo-User: operator
+Authorization: Bearer {{operatorLogin.response.body.$.accessToken}}
 
 {
   "name": "Invalid Inventory Item",
@@ -755,7 +877,7 @@ X-Demo-User: operator
 
 POST {{InventoryReorderPlatform.Api_HostAddress}}/api/inventoryitems
 Content-Type: application/json
-X-Demo-User: operator
+Authorization: Bearer {{operatorLogin.response.body.$.accessToken}}
 
 {
   "name": "Invalid Threshold Item",
@@ -774,7 +896,7 @@ X-Demo-User: operator
 
 POST {{InventoryReorderPlatform.Api_HostAddress}}/api/inventoryitems
 Content-Type: application/json
-X-Demo-User: operator
+Authorization: Bearer {{operatorLogin.response.body.$.accessToken}}
 
 {
   "name": "",
@@ -790,19 +912,19 @@ X-Demo-User: operator
 
 GET {{InventoryReorderPlatform.Api_HostAddress}}/api/inventoryitems
 Accept: application/json
-X-Demo-User: viewer
+Authorization: Bearer {{viewerLogin.response.body.$.accessToken}}
 
 ###
 
 // Confirm invalid requests did not create audit records
 //
 // Expected:
-// - Six total audit records
+// - Eight total audit records
 // - No records corresponding to rejected or invalid requests
 
 GET {{InventoryReorderPlatform.Api_HostAddress}}/api/audit-records
 Accept: application/json
-X-Demo-User: admin
+Authorization: Bearer {{adminLogin.response.body.$.accessToken}}
 
 ###
 
@@ -829,7 +951,7 @@ X-Demo-User: admin
 
 GET {{InventoryReorderPlatform.Api_HostAddress}}/api/inventoryitems
 Accept: application/json
-X-Demo-User: viewer
+Authorization: Bearer {{viewerLogin.response.body.$.accessToken}}
 
 ###
 
@@ -843,7 +965,7 @@ X-Demo-User: viewer
 
 GET {{InventoryReorderPlatform.Api_HostAddress}}/api/reorderevents
 Accept: application/json
-X-Demo-User: viewer
+Authorization: Bearer {{viewerLogin.response.body.$.accessToken}}
 
 ###
 
@@ -857,6 +979,6 @@ X-Demo-User: viewer
 
 GET {{InventoryReorderPlatform.Api_HostAddress}}/api/operations/health
 Accept: application/json
-X-Demo-User: viewer
+Authorization: Bearer {{viewerLogin.response.body.$.accessToken}}
 
 ###
