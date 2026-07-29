@@ -327,6 +327,64 @@ button:disabled {
   text-align: center;
 }
 
+.account-create-form {
+  border-top: 1px solid #dde3ee;
+  border-bottom: 1px solid #dde3ee;
+  padding: 1.25rem 0;
+  margin-bottom: 1.25rem;
+}
+
+.account-create-form h3,
+.account-create-form > p {
+  text-align: center;
+}
+
+.account-form-grid {
+  display: grid;
+  grid-template-columns:
+    minmax(0, 2fr)
+    minmax(160px, 1fr);
+  gap: 1rem;
+  margin: 1rem 0;
+}
+
+.account-form-grid label {
+  display: grid;
+  gap: 0.4rem;
+  font-weight: 600;
+  text-align: left;
+}
+
+.account-form-grid input,
+.account-form-grid select {
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.6rem;
+  padding: 0.75rem;
+  background: white;
+  color: #172033;
+  font: inherit;
+}
+
+.account-password-field {
+  grid-column: 1 / -1;
+}
+
+.field-help {
+  color: #526070;
+  font-size: 0.85rem;
+  font-weight: 400;
+}
+
+.success-message {
+  background: #dcfce7;
+  color: #166534 !important;
+  border: 1px solid #bbf7d0;
+  border-radius: 0.75rem;
+  padding: 0.75rem 1rem;
+  text-align: center;
+}
+
 @media (max-width: 760px) {
   .grid,
   .summary-grid,
@@ -343,6 +401,18 @@ button:disabled {
   }
 
   .secondary-button {
+    width: 100%;
+  }
+
+  .account-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .account-password-field {
+    grid-column: auto;
+  }
+
+  .account-create-form button {
     width: 100%;
   }
 }

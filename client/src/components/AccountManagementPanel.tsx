@@ -1,47 +1,55 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 
 import { listAccounts } from '../api/accounts'
 import type { Account } from '../types/account'
+import { CreateAccountForm } from './CreateAccountForm'
 
 export function AccountManagementPanel() {
-  const [accounts, setAccounts] = useState<Account[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [errorMessage, setErrorMessage] = useState('')
+  const [accounts, setAccounts] =
+    useState<Account[]>([])
 
-  useEffect(() => {
-    let isCurrent = true
+  const [isLoading, setIsLoading] =
+    useState(true)
 
-    async function loadAccounts() {
-      setIsLoading(true)
-      setErrorMessage('')
+  const [errorMessage, setErrorMessage] =
+    useState('')
 
-      try {
-        const loadedAccounts = await listAccounts()
+  const [successMessage, setSuccessMessage] =
+    useState('')
 
-        if (isCurrent) {
-          setAccounts(loadedAccounts)
-        }
-      } catch (error) {
-        if (isCurrent) {
-          setErrorMessage(
-            error instanceof Error
-              ? error.message
-              : 'Unable to load accounts.',
-          )
-        }
-      } finally {
-        if (isCurrent) {
-          setIsLoading(false)
-        }
-      }
-    }
+  const loadAccounts = useCallback(async () => {
+    setIsLoading(true)
+    setErrorMessage('')
 
-    void loadAccounts()
+    try {
+      const loadedAccounts =
+        await listAccounts()
 
-    return () => {
-      isCurrent = false
+      setAccounts(loadedAccounts)
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : 'Unable to load accounts.',
+      )
+    } finally {
+      setIsLoading(false)
     }
   }, [])
+
+  useEffect(() => {
+    void loadAccounts()
+  }, [loadAccounts])
+
+  async function handleAccountCreated(
+    account: Account,
+  ) {
+    await loadAccounts()
+
+    setSuccessMessage(
+      `Account created for ${account.email}.`,
+    )
+  }
 
   return (
     <section className="card account-management">
@@ -50,8 +58,8 @@ export function AccountManagementPanel() {
           <h2>Account Management</h2>
 
           <p>
-            Review application accounts, assigned roles,
-            and access status.
+            Create and review application accounts,
+            assigned roles, and access status.
           </p>
         </div>
       </div>
@@ -120,6 +128,16 @@ export function AccountManagementPanel() {
             </table>
           </div>
         )}
+
+      <CreateAccountForm
+        onCreated={handleAccountCreated}
+      />
+
+      {successMessage && (
+        <p className="success-message">
+          {successMessage}
+        </p>
+      )}
     </section>
   )
 }

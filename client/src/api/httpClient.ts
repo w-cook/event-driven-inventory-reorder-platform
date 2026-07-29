@@ -27,17 +27,60 @@ export async function apiFetch(
   })
 }
 
+interface ApiProblemDetails {
+  title?: string
+  detail?: string
+  errors?: Record<string, string[]>
+}
+
 export async function handleJsonResponse<T>(
   response: Response,
 ): Promise<T> {
-  if (!response.ok) {
-    const responseBody = await response.text()
+  const responseBody = await response.text()
 
+  if (!response.ok) {
     throw new Error(
-      responseBody ||
-        `Request failed with status ${response.status}`,
+      getApiErrorMessage(
+        responseBody,
+        response.status,
+      ),
     )
   }
 
-  return response.json() as Promise<T>
+  if (!responseBody) {
+    throw new Error(
+      'The server returned an empty response.',
+    )
+  }
+
+  return JSON.parse(responseBody) as T
+}
+
+function getApiErrorMessage(
+  responseBody: string,
+  status: number,
+): string {
+  if (!responseBody) {
+    return `Request failed with status ${status}.`
+  }
+
+  try {
+    const problem =
+      JSON.parse(responseBody) as ApiProblemDetails
+
+    const validationMessages =
+      Object.values(problem.errors ?? {}).flat()
+
+    if (validationMessages.length > 0) {
+      return validationMessages.join(' ')
+    }
+
+    return (
+      problem.detail ??
+      problem.title ??
+      `Request failed with status ${status}.`
+    )
+  } catch {
+    return responseBody
+  }
 }
