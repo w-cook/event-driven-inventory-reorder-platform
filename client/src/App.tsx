@@ -197,7 +197,9 @@ function App() {
       </section>
 
       {isAdministrator && (
-        <AccountManagementPanel />
+        <AccountManagementPanel
+          currentUserEmail={session.email}
+        />
       )}
     </main>
   )

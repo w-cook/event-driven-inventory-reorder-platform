@@ -385,6 +385,38 @@ button:disabled {
   text-align: center;
 }
 
+.account-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.account-role-control {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.account-role-control select {
+  border: 1px solid #cbd5e1;
+  border-radius: 0.6rem;
+  padding: 0.65rem;
+  background: white;
+  color: #172033;
+  font: inherit;
+}
+
+.account-actions button {
+  white-space: nowrap;
+}
+
+.current-account-label {
+  color: #526070;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
 @media (max-width: 760px) {
   .grid,
   .summary-grid,
@@ -413,6 +445,17 @@ button:disabled {
   }
 
   .account-create-form button {
+    width: 100%;
+  }
+
+  .account-actions,
+  .account-role-control {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .account-role-control select,
+  .account-actions button {
     width: 100%;
   }
 }
