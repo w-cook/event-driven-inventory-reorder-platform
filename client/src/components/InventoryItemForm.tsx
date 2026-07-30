@@ -15,7 +15,7 @@ interface Props {
   onSaved: (
     item: InventoryItem,
     wasCreated: boolean,
-  ) => void
+  ) => Promise<void>
   onCancelEdit: () => void
 }
 
@@ -71,7 +71,7 @@ export function InventoryItemForm({
           )
         : await createInventoryItem(request)
 
-      onSaved(savedItem, !isEditing)
+      await onSaved(savedItem, !isEditing)
 
       setSuccessMessage(
         isEditing

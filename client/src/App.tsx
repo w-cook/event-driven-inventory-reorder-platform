@@ -197,10 +197,10 @@ function App() {
     session.roles.includes('Operator') ||
     isAdministrator
 
-  function handleInventorySaved(
+  async function handleInventorySaved(
     savedItem: InventoryItem,
     wasCreated: boolean,
-  ) {
+  ): Promise<void> {
     setItems(currentItems => {
       if (wasCreated) {
         return [savedItem, ...currentItems]
@@ -215,6 +215,61 @@ function App() {
 
     if (!wasCreated) {
       setEditingItem(savedItem)
+    }
+
+    setIsLoading(true)
+    setErrorMessage('')
+
+    try {
+      const [
+        loadedItems,
+        loadedReorderEvents,
+      ] = await Promise.all([
+        listInventoryItems(),
+        listReorderEvents(),
+      ])
+
+      setItems(loadedItems)
+      setReorderEvents(loadedReorderEvents)
+
+      if (!wasCreated) {
+        const refreshedItem =
+          loadedItems.find(
+            item => item.id === savedItem.id,
+          ) ?? savedItem
+
+        setEditingItem(refreshedItem)
+      }
+    } catch (error) {
+      const refreshMessage =
+        error instanceof Error
+          ? error.message
+          : 'Unable to reload dashboard data.'
+
+      throw new Error(
+        `The inventory item was saved, but the dashboard could not refresh. ${refreshMessage}`,
+        { cause: error },
+      )
+    } finally {
+      setIsLoading(false)
+    }
+
+    setIsHealthLoading(true)
+    setHealthErrorMessage('')
+
+    try {
+      const refreshedHealth =
+        await getSystemHealth()
+
+      setSystemHealth(refreshedHealth)
+    } catch (error) {
+      setHealthErrorMessage(
+        error instanceof Error
+          ? error.message
+          : 'Unable to refresh system health.',
+      )
+    } finally {
+      setIsHealthLoading(false)
     }
   }
 
