@@ -81,7 +81,8 @@ public sealed class AuthorizationTests
             Name = "Authorization Test Item",
             Sku = "AUTH-VIEWER-001",
             QuantityOnHand = 20,
-            ReorderThreshold = 5
+            ReorderThreshold = 5,
+            ReorderQuantity = 10
         };
 
         var response = await client.PutAsJsonAsync(
@@ -138,7 +139,8 @@ public sealed class AuthorizationTests
             Name = "Operator Test Item",
             Sku = "AUTH-OPERATOR-001",
             QuantityOnHand = 20,
-            ReorderThreshold = 5
+            ReorderThreshold = 5,
+            ReorderQuantity = 10
         };
 
         var createResponse = await client.PostAsJsonAsync(
@@ -162,7 +164,8 @@ public sealed class AuthorizationTests
             Name = createdItem.Name,
             Sku = createdItem.Sku,
             QuantityOnHand = 25,
-            ReorderThreshold = createdItem.ReorderThreshold
+            ReorderThreshold = createdItem.ReorderThreshold,
+            ReorderQuantity = createdItem.ReorderQuantity
         };
 
         var updateResponse = await client.PutAsJsonAsync(
@@ -181,6 +184,9 @@ public sealed class AuthorizationTests
 
         Assert.NotNull(updatedItem);
         Assert.Equal(25, updatedItem.QuantityOnHand);
+        Assert.Equal(
+            createdItem.ReorderQuantity,
+            updatedItem.ReorderQuantity);
 
         using var scope =
             _factory.Services.CreateScope();
@@ -226,6 +232,10 @@ public sealed class AuthorizationTests
 
         Assert.Contains(
             "\"QuantityOnHand\":25",
+            auditRecord.Details);
+
+        Assert.Contains(
+            "\"ReorderQuantity\":10",
             auditRecord.Details);
 
         Assert.NotEqual(

@@ -50,7 +50,8 @@ public sealed class ReorderWorkflowTests
             Name = "Low Stock Workflow Item",
             Sku = $"WORKFLOW-{Guid.NewGuid():N}",
             QuantityOnHand = 3,
-            ReorderThreshold = 5
+            ReorderThreshold = 5,
+            ReorderQuantity = 12
         };
 
         var response = await client.PostAsJsonAsync(
@@ -68,6 +69,10 @@ public sealed class ReorderWorkflowTests
                     cancellationToken: cancellationToken);
 
         Assert.NotNull(createdItem);
+
+        Assert.Equal(
+            12,
+            createdItem.ReorderQuantity);
 
         Assert.Equal(
             "ReorderPending",
@@ -92,6 +97,10 @@ public sealed class ReorderWorkflowTests
         Assert.Equal(
             3,
             reorderEvent.QuantityAtTrigger);
+
+        Assert.Equal(
+            12,
+            reorderEvent.RequestedQuantity);
 
         Assert.Equal(
             "Pending",
@@ -129,6 +138,10 @@ public sealed class ReorderWorkflowTests
             "\"ReorderEventCreated\":true",
             auditRecord.Details);
 
+        Assert.Contains(
+            "\"ReorderQuantity\":12",
+            auditRecord.Details);
+
         var publishedMessage =
             Assert.Single(
                 _factory.MessagePublisher.Messages);
@@ -148,6 +161,10 @@ public sealed class ReorderWorkflowTests
         Assert.Equal(
             reorderEvent.QuantityAtTrigger,
             publishedMessage.QuantityAtTrigger);
+
+        Assert.Equal(
+            reorderEvent.RequestedQuantity,
+            publishedMessage.RequestedQuantity);
 
         Assert.Equal(
             reorderEvent.TriggeredAt,
@@ -176,7 +193,8 @@ public sealed class ReorderWorkflowTests
             Name = "End-to-End Workflow Item",
             Sku = $"E2E-{Guid.NewGuid():N}",
             QuantityOnHand = 2,
-            ReorderThreshold = 5
+            ReorderThreshold = 5,
+            ReorderQuantity = 18
         };
 
         var response = await client.PostAsJsonAsync(
@@ -198,6 +216,10 @@ public sealed class ReorderWorkflowTests
         var publishedMessage =
             Assert.Single(
                 _factory.MessagePublisher.Messages);
+
+        Assert.Equal(
+            18,
+            publishedMessage.RequestedQuantity);
 
         using var scope =
             _factory.Services.CreateScope();
@@ -245,6 +267,10 @@ public sealed class ReorderWorkflowTests
             "Processed",
             reorderEvent.Status);
 
+        Assert.Equal(
+            publishedMessage.RequestedQuantity,
+            reorderEvent.RequestedQuantity);
+
         var processedMessage =
             await dbContext.ProcessedMessages
                 .AsNoTracking()
@@ -267,5 +293,147 @@ public sealed class ReorderWorkflowTests
                     item =>
                         item.MessageId == messageId,
                     cancellationToken));
+    }
+
+    [Fact]
+    public async Task CreatingItem_WithZeroReorderQuantity_ReturnsBadRequest()
+    {
+        var cancellationToken =
+            TestContext.Current.CancellationToken;
+
+        _factory.MessagePublisher.Clear();
+
+        var authenticated =
+            await TestAuthentication
+                .CreateAuthenticatedClientAsync(
+                    _factory,
+                    AppRoles.Operator,
+                    cancellationToken);
+
+        using var client = authenticated.Client;
+
+        var request = new
+        {
+            Name = "Invalid Reorder Quantity Item",
+            Sku = $"INVALID-REORDER-{Guid.NewGuid():N}",
+            QuantityOnHand = 10,
+            ReorderThreshold = 5,
+            ReorderQuantity = 0
+        };
+
+        var response = await client.PostAsJsonAsync(
+            "/api/inventoryitems",
+            request,
+            cancellationToken);
+
+        Assert.Equal(
+            HttpStatusCode.BadRequest,
+            response.StatusCode);
+
+        Assert.Empty(
+            _factory.MessagePublisher.Messages);
+    }
+
+    [Fact]
+    public async Task UpdatingConfiguredReorderQuantity_DoesNotChangeExistingRequestedQuantity()
+    {
+        var cancellationToken =
+            TestContext.Current.CancellationToken;
+
+        _factory.MessagePublisher.Clear();
+
+        var authenticated =
+            await TestAuthentication
+                .CreateAuthenticatedClientAsync(
+                    _factory,
+                    AppRoles.Operator,
+                    cancellationToken);
+
+        using var client = authenticated.Client;
+
+        var createRequest = new
+        {
+            Name = "Reorder Snapshot Item",
+            Sku = $"SNAPSHOT-{Guid.NewGuid():N}",
+            QuantityOnHand = 3,
+            ReorderThreshold = 5,
+            ReorderQuantity = 12
+        };
+
+        var createResponse = await client.PostAsJsonAsync(
+            "/api/inventoryitems",
+            createRequest,
+            cancellationToken);
+
+        Assert.Equal(
+            HttpStatusCode.Created,
+            createResponse.StatusCode);
+
+        var createdItem =
+            await createResponse.Content
+                .ReadFromJsonAsync<InventoryItemResponse>(
+                    cancellationToken: cancellationToken);
+
+        Assert.NotNull(createdItem);
+
+        var originalMessage =
+            Assert.Single(
+                _factory.MessagePublisher.Messages);
+
+        Assert.Equal(
+            12,
+            originalMessage.RequestedQuantity);
+
+        var updateRequest = new
+        {
+            Name = createdItem.Name,
+            Sku = createdItem.Sku,
+            QuantityOnHand = createdItem.QuantityOnHand,
+            ReorderThreshold = createdItem.ReorderThreshold,
+            ReorderQuantity = 24
+        };
+
+        var updateResponse = await client.PutAsJsonAsync(
+            $"/api/inventoryitems/{createdItem.Id}",
+            updateRequest,
+            cancellationToken);
+
+        Assert.Equal(
+            HttpStatusCode.OK,
+            updateResponse.StatusCode);
+
+        var updatedItem =
+            await updateResponse.Content
+                .ReadFromJsonAsync<InventoryItemResponse>(
+                    cancellationToken: cancellationToken);
+
+        Assert.NotNull(updatedItem);
+
+        Assert.Equal(
+            24,
+            updatedItem.ReorderQuantity);
+
+        using var scope =
+            _factory.Services.CreateScope();
+
+        var dbContext =
+            scope.ServiceProvider
+                .GetRequiredService<AppDbContext>();
+
+        var reorderEvent =
+            await dbContext.ReorderEvents
+                .AsNoTracking()
+                .SingleAsync(
+                    item =>
+                        item.InventoryItemId ==
+                        createdItem.Id,
+                    cancellationToken);
+
+        Assert.Equal(
+            12,
+            reorderEvent.RequestedQuantity);
+
+        Assert.Single(
+            _factory.MessagePublisher.Messages);
     }
 }
