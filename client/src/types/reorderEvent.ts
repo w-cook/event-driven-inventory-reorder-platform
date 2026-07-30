@@ -5,6 +5,7 @@ export interface ReorderEvent {
   inventoryItemId: number
   inventoryItem: InventoryItem | null
   quantityAtTrigger: number
+  requestedQuantity: number
   triggeredAt: string
   status: string
 }

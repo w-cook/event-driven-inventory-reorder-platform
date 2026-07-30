@@ -4,6 +4,7 @@ export interface InventoryItem {
   sku: string
   quantityOnHand: number
   reorderThreshold: number
+  reorderQuantity: number
   status: string
   createdAt: string
   updatedAt: string
