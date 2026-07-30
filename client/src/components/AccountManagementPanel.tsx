@@ -1,5 +1,4 @@
 import {
-  useCallback,
   useEffect,
   useState,
 } from 'react'
@@ -34,6 +33,17 @@ function getPrimaryRole(
     'Viewer'
 }
 
+function createRoleDrafts(
+  accounts: Account[],
+): Record<string, AccountRole> {
+  return Object.fromEntries(
+    accounts.map(account => [
+      account.id,
+      getPrimaryRole(account),
+    ]),
+  ) as Record<string, AccountRole>
+}
+
 export function AccountManagementPanel({
   currentUserEmail,
 }: AccountManagementPanelProps) {
@@ -60,22 +70,50 @@ export function AccountManagementPanel({
   const [successMessage, setSuccessMessage] =
     useState('')
 
-  const loadAccounts = useCallback(async () => {
-    setIsLoading(true)
-    setErrorMessage('')
+  useEffect(() => {
+    let cancelled = false
 
+    void listAccounts()
+      .then(loadedAccounts => {
+        if (cancelled) {
+          return
+        }
+
+        setAccounts(loadedAccounts)
+        setRoleDrafts(
+          createRoleDrafts(loadedAccounts),
+        )
+      })
+      .catch(error => {
+        if (cancelled) {
+          return
+        }
+
+        setErrorMessage(
+          error instanceof Error
+            ? error.message
+            : 'Unable to load accounts.',
+        )
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsLoading(false)
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  async function loadAccounts() {
     try {
       const loadedAccounts =
         await listAccounts()
 
       setAccounts(loadedAccounts)
       setRoleDrafts(
-        Object.fromEntries(
-          loadedAccounts.map(account => [
-            account.id,
-            getPrimaryRole(account),
-          ]),
-        ) as Record<string, AccountRole>,
+        createRoleDrafts(loadedAccounts),
       )
     } catch (error) {
       setErrorMessage(
@@ -86,16 +124,14 @@ export function AccountManagementPanel({
     } finally {
       setIsLoading(false)
     }
-  }, [])
-
-  useEffect(() => {
-    void loadAccounts()
-  }, [loadAccounts])
+  }
 
   async function handleAccountCreated(
     account: Account,
   ) {
     setMutationErrorMessage('')
+    setIsLoading(true)
+    setErrorMessage('')
 
     await loadAccounts()
 

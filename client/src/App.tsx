@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import './App.css'
 
 import {
@@ -41,60 +41,69 @@ function App() {
     return items.filter(isLowStock)
   }, [items, showLowStockOnly])
 
-  const loadSystemHealth = useCallback(async () => {
-    setIsHealthLoading(true)
-    setHealthErrorMessage('')
-
-    try {
-      const health = await getSystemHealth()
-      setSystemHealth(health)
-    } catch (error) {
-      setHealthErrorMessage(
-        error instanceof Error
-          ? error.message
-          : 'Unable to load system health.',
-      )
-    } finally {
-      setIsHealthLoading(false)
-    }
-  }, [])
-
-  const loadDashboardData = useCallback(async () => {
-    setIsLoading(true)
-    setErrorMessage('')
-
-    try {
-      const [loadedItems, loadedReorderEvents] =
-        await Promise.all([
-          listInventoryItems(),
-          listReorderEvents(),
-        ])
-
-      setItems(loadedItems)
-      setReorderEvents(loadedReorderEvents)
-    } catch (error) {
-      setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : 'Unable to load dashboard data.',
-      )
-    } finally {
-      setIsLoading(false)
-    }
-  }, [])
-
   useEffect(() => {
     if (!session) {
       return
     }
 
-    void loadDashboardData()
-    void loadSystemHealth()
-  }, [
-    session,
-    loadDashboardData,
-    loadSystemHealth,
-  ])
+    let cancelled = false
+
+    void Promise.all([
+      listInventoryItems(),
+      listReorderEvents(),
+    ])
+      .then(([loadedItems, loadedReorderEvents]) => {
+        if (cancelled) {
+          return
+        }
+
+        setItems(loadedItems)
+        setReorderEvents(loadedReorderEvents)
+      })
+      .catch(error => {
+        if (cancelled) {
+          return
+        }
+
+        setErrorMessage(
+          error instanceof Error
+            ? error.message
+            : 'Unable to load dashboard data.',
+        )
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsLoading(false)
+        }
+      })
+
+    void getSystemHealth()
+      .then(health => {
+        if (!cancelled) {
+          setSystemHealth(health)
+        }
+      })
+      .catch(error => {
+        if (cancelled) {
+          return
+        }
+
+        setHealthErrorMessage(
+          error instanceof Error
+            ? error.message
+            : 'Unable to load system health.',
+        )
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsHealthLoading(false)
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [session])
 
   function handleAuthenticated(
     authenticatedSession: LoginResponse,
@@ -102,6 +111,12 @@ function App() {
     setAccessToken(
       authenticatedSession.accessToken,
     )
+
+    setIsLoading(true)
+    setErrorMessage('')
+
+    setIsHealthLoading(true)
+    setHealthErrorMessage('')
 
     setSession(authenticatedSession)
   }
@@ -116,6 +131,24 @@ function App() {
 
     setErrorMessage('')
     setHealthErrorMessage('')
+  }
+
+  function handleHealthRefresh() {
+    setIsHealthLoading(true)
+    setHealthErrorMessage('')
+
+    void getSystemHealth()
+      .then(setSystemHealth)
+      .catch(error => {
+        setHealthErrorMessage(
+          error instanceof Error
+            ? error.message
+            : 'Unable to load system health.',
+        )
+      })
+      .finally(() => {
+        setIsHealthLoading(false)
+      })
   }
 
   if (!session) {
@@ -192,7 +225,7 @@ function App() {
           health={systemHealth}
           isLoading={isHealthLoading}
           errorMessage={healthErrorMessage}
-          onRefresh={loadSystemHealth}
+          onRefresh={handleHealthRefresh}
         />
       </section>
 
