@@ -2,7 +2,7 @@
 
 React/TypeScript frontend for the Event-Driven Inventory Reorder Platform.
 
-The client provides an authenticated operations dashboard for inventory visibility, low-stock review, reorder-processing history, application health, and Administrator account management. Inventory and workflow business rules remain in the ASP.NET Core API.
+The client provides an authenticated operations dashboard for inventory visibility, low-stock review, configured reorder quantities, reorder-request snapshots, processing history, application health, and Administrator account management. Inventory and workflow business rules remain in the ASP.NET Core API.
 
 ## Features
 
@@ -10,9 +10,9 @@ The client provides an authenticated operations dashboard for inventory visibili
 - JWT bearer authentication through the shared API client
 - signed-in user and role visibility
 - inventory and workflow summary metrics
-- inventory table with backend-derived status badges
+- inventory table with current stock, thresholds, configured reorder quantities, and backend-derived status badges
 - low-stock filtering
-- reorder-event processing history
+- reorder-event processing history with quantity-at-trigger and requested-quantity snapshots
 - application and database health panel
 - manual health refresh
 - Administrator-only account listing

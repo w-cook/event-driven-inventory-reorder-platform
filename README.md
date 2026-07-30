@@ -6,17 +6,35 @@ The project focuses on practical backend and distributed-system concerns while r
 
 ## Screenshots
 
+### JWT Login
+
+![Inventory Operations Dashboard login screen](docs/images/login-screen.png)
+
+The React client authenticates application-managed users through the protected login endpoint and keeps the returned JWT access token only in frontend memory.
+
 ### Operations Dashboard
 
 ![Inventory Operations Dashboard overview](docs/images/operations-dashboard-overview.png)
 
-The React/TypeScript dashboard combines inventory and workflow summary metrics, inventory status, reorder-processing history, and application health in one operator-facing view.
+The authenticated React/TypeScript dashboard combines inventory and workflow summaries, current stock conditions, configured reorder quantities, low-stock filtering, and signed-in user context in one operator-facing view.
+
+### Reorder Quantity Workflow
+
+![Inventory and reorder workflow quantity comparison](docs/images/reorder-workflow-quantities.png)
+
+Inventory items retain a configurable reorder quantity for future workflows, while each reorder event stores an independent requested-quantity snapshot. Later inventory configuration changes do not rewrite the quantity associated with an existing reorder request.
 
 ### Low-Stock Review
 
 ![Inventory dashboard filtered to low-stock items](docs/images/inventory-low-stock-filter.png)
 
-The low-stock filter narrows the inventory table to items requiring attention while retaining workflow and system-health context.
+The low-stock filter narrows the inventory table to items requiring attention while retaining their current quantity, reorder threshold, configured reorder quantity, and workflow context.
+
+### Administrator Account Management
+
+![Administrator account management interface](docs/images/account-management.png)
+
+Authenticated Administrators can create application accounts, review assigned roles and activation status, change roles, and deactivate or reactivate accounts through the role-aware frontend.
 
 ### Correlated Workflow Diagnostics
 
@@ -26,19 +44,35 @@ Filtered Aspire structured logs show the same correlation identifier across API 
 
 ## Project Overview
 
-Inventory items have stock levels and reorder thresholds. When an authenticated Operator or Administrator creates an item below its threshold, or updates an active item into a low-stock state, the API:
+Inventory items have current stock levels, reorder thresholds, and configurable reorder quantities. When an authenticated Operator or Administrator creates an item below its threshold, or updates an active item into a low-stock state, the API:
 
 1. calculates the inventory status
 2. changes the item to `ReorderPending`
-3. creates a `Pending` reorder event
+3. creates a `Pending` reorder event containing the configured reorder quantity as an immutable requested-quantity snapshot
 4. writes an audit record for the successful action
-5. publishes a `ReorderRequestedMessage`
+5. publishes a `ReorderRequestedMessage` containing the same requested quantity
 
 A separate Processor consumes the message, applies duplicate protection, performs the internal reorder-request workflow, records successful processing, and changes the reorder event to `Processed`.
 
 A processed reorder event does **not** mean that replacement stock has arrived. The Processor does not increase `QuantityOnHand`. The inventory item remains `ReorderPending` until a later inventory update raises its quantity above the reorder threshold.
 
 The project intentionally models a focused internal business platform. It does not claim integration with an external enterprise identity provider, a real supplier integration, automated purchasing, or physical inventory fulfillment.
+
+### Inventory Quantity Semantics
+
+The inventory and workflow models intentionally distinguish several related values:
+
+| Value | Meaning |
+| --- | --- |
+| `QuantityOnHand` | Current physical stock recorded for the inventory item |
+| `ReorderThreshold` | Stock level at or below which a reorder workflow is triggered |
+| `ReorderQuantity` | Current configured amount to request when a future reorder workflow begins |
+| `QuantityAtTrigger` | Snapshot of physical stock when a specific reorder event was created |
+| `RequestedQuantity` | Immutable amount requested by that specific reorder event and message |
+
+Changing an inventory item’s `ReorderQuantity` affects later reorder workflows only. It does not alter `RequestedQuantity` on previously created reorder events.
+
+A processed reorder request remains distinct from receiving replacement stock. Stock receipt is represented only by a later inventory update that increases `QuantityOnHand`.
 
 ## What This Project Demonstrates
 
@@ -50,6 +84,8 @@ The project intentionally models a focused internal business platform. It does n
 - background processing with a .NET Worker Service
 - event-driven producer/consumer architecture
 - Entity Framework Core with SQL Server
+- configurable inventory reorder quantities
+- immutable workflow snapshots across API, queue, Processor, and persistence boundaries
 - reliable, idempotent message processing
 - retry and dead-letter behavior
 - SQL-backed audit, processing, and failure records
@@ -70,9 +106,9 @@ The React/TypeScript client provides:
 - in-memory JWT access-token handling
 - signed-in user and role visibility
 - inventory and workflow summary metrics
-- inventory status and quantity visibility
+- current stock, threshold, and configured reorder-quantity visibility
 - low-stock filtering
-- reorder-event processing history
+- reorder-event processing history with trigger and requested-quantity snapshots
 - application and database health information
 - Administrator-only account listing and creation
 - Administrator account role and activation controls
@@ -459,6 +495,20 @@ PATCH  /api/accounts/{id}/status
 
 Inventory creation and update requests require the Operator or Administrator role.
 
+Inventory create and update payloads use the same required business fields:
+
+```json
+{
+  "name": "Mechanical Keyboard",
+  "sku": "KEY-1001",
+  "quantityOnHand": 20,
+  "reorderThreshold": 5,
+  "reorderQuantity": 10
+}
+```
+
+`reorderQuantity` must be greater than zero. When an item transitions into `ReorderPending`, the API copies that configured value into the resulting reorder event and `ReorderRequestedMessage` as `requestedQuantity`.
+
 Audit-record access and all account-management requests require the Administrator role.
 
 The complete authenticated manual-verification sequence is maintained in:
@@ -494,6 +544,10 @@ The automated tests verify:
 - the correlation middleware generates an identifier when one is absent
 - the correlation middleware preserves and returns a caller-supplied identifier
 - isolated API-to-processor workflow behavior is covered by the production-oriented test suite
+- inventory creation and updates validate positive configured reorder quantities
+- reorder events and messages preserve the requested quantity captured when the workflow begins
+- later inventory configuration changes do not rewrite historical requested quantities
+- duplicate and recovered Processor handling preserve the original requested-quantity snapshot
 
 Run the frontend checks with:
 
@@ -510,12 +564,13 @@ Direct Azure Service Bus settlement tests are not currently included because the
 Each document has a focused purpose:
 
 - [Expansion roadmap](docs/inventory-operations-roadmap.md) — completed and remaining expansion scope
+- [System architecture](docs/architecture.md) — components, runtime boundaries, data flow, persistence responsibilities, messaging, authentication, and observability design
 - [Engineering case study](docs/inventory-operations-case-study.md) — design decisions, rationale, tradeoffs, and portfolio value
 - [Failure scenarios](docs/failure-scenarios.md) — expected failure behavior, recovery expectations, evidence, and known limitations
 - [Observability runbook](docs/observability-runbook.md) — operational steps for tracing and diagnosing a workflow
 - [Frontend README](client/README.md) — client-specific startup, proxy configuration, environment settings, and scripts
 
-The operations dashboard, Identity/JWT authentication, authorization and auditing, reliable message processing, observability, and production-oriented test phases are complete. Remaining inventory-configuration, privileged-operation UI, interface-polish, and final API-documentation work is tracked in the roadmap.
+The operations dashboard, Identity/JWT authentication, authorization and auditing, reliable message processing, observability, production-oriented testing, and reorder-quantity configuration phases are complete. Remaining privileged-operation UI, interface-polish, and final API-documentation work is tracked in the roadmap.
 
 ## Scope and Limitations
 
@@ -532,6 +587,7 @@ The operations dashboard, Identity/JWT authentication, authorization and auditin
 - role-aware API operations
 - operator-facing dashboard visibility
 - local health, logs, metrics, and traces
+- configurable reorder quantities and immutable per-event requested-quantity snapshots
 - Aspire and Docker-based development modes
 - Azure-compatible, zero-cost local messaging
 

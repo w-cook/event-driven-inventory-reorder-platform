@@ -101,17 +101,17 @@ The final step of each phase must:
 
 ### Phase 7 — Reorder Quantity and Inventory Configuration
 
-- [ ] add a configured reorder quantity to inventory items
-- [ ] copy the reorder quantity into each reorder event when triggered
-- [ ] include the requested reorder quantity in `ReorderRequestedMessage`
-- [ ] persist the requested quantity independently of later inventory changes
-- [ ] update create and edit request validation
-- [ ] add the required EF Core migration
-- [ ] update API responses and frontend types
-- [ ] display requested reorder quantities in workflow views
-- [ ] extend processor and workflow tests for the new field
-- [ ] clearly distinguish requested reorder quantity from stock received
-- [ ] update all affected documentation and refresh screenshots where the frontend changed
+- [x] add a configured reorder quantity to inventory items
+- [x] copy the reorder quantity into each reorder event when triggered
+- [x] include the requested reorder quantity in `ReorderRequestedMessage`
+- [x] persist the requested quantity independently of later inventory changes
+- [x] update create and edit request validation
+- [x] add the required EF Core migration
+- [x] update API responses and frontend types
+- [x] display requested reorder quantities in workflow views
+- [x] extend processor and workflow tests for the new field
+- [x] clearly distinguish requested reorder quantity from stock received
+- [x] update all affected documentation and refresh screenshots where the frontend changed
 
 ### Phase 8 — Privileged Operations and Administration UI
 
