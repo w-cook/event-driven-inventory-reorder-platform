@@ -6,10 +6,12 @@ import type { LoginResponse } from '../types/auth'
 
 interface LoginFormProps {
   onAuthenticated: (session: LoginResponse) => void
+  noticeMessage?: string
 }
 
 export function LoginForm({
   onAuthenticated,
+  noticeMessage = '',
 }: LoginFormProps) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -55,6 +57,12 @@ export function LoginForm({
           Use an application account to access the
           operations dashboard.
         </p>
+
+        {noticeMessage && (
+          <p className="session-notice">
+            {noticeMessage}
+          </p>
+        )}
 
         {errorMessage && (
           <p className="error">{errorMessage}</p>

@@ -4,6 +4,7 @@ import './App.css'
 import {
   clearAccessToken,
   setAccessToken,
+  setUnauthorizedHandler,
 } from './api/httpClient'
 import { listInventoryItems } from './api/inventoryItems'
 import { listReorderEvents } from './api/reorderEvents'
@@ -22,6 +23,7 @@ import type { SystemHealth } from './types/systemHealth'
 
 function App() {
   const [session, setSession] = useState<LoginResponse | null>(null)
+  const [sessionNotice, setSessionNotice] = useState('')
 
   const [items, setItems] = useState<InventoryItem[]>([])
   const [reorderEvents, setReorderEvents] = useState<ReorderEvent[]>([])
@@ -40,6 +42,29 @@ function App() {
 
     return items.filter(isLowStock)
   }, [items, showLowStockOnly])
+
+  useEffect(() => {
+    setUnauthorizedHandler(() => {
+      setSessionNotice(
+        'Your session expired or is no longer authorized. Please sign in again.',
+      )
+
+      setSession(null)
+      setItems([])
+      setReorderEvents([])
+      setSystemHealth(null)
+
+      setIsLoading(false)
+      setIsHealthLoading(false)
+
+      setErrorMessage('')
+      setHealthErrorMessage('')
+    })
+
+    return () => {
+      setUnauthorizedHandler(null)
+    }
+  }, [])
 
   useEffect(() => {
     if (!session) {
@@ -118,6 +143,7 @@ function App() {
     setIsHealthLoading(true)
     setHealthErrorMessage('')
 
+    setSessionNotice('')
     setSession(authenticatedSession)
   }
 
@@ -155,6 +181,7 @@ function App() {
     return (
       <LoginForm
         onAuthenticated={handleAuthenticated}
+        noticeMessage={sessionNotice}
       />
     )
   }
