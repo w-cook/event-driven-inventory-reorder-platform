@@ -29,6 +29,7 @@ namespace InventoryReorderPlatform.Api.Controllers
                     Id = r.Id,
                     InventoryItemId = r.InventoryItemId,
                     QuantityAtTrigger = r.QuantityAtTrigger,
+                    RequestedQuantity = r.RequestedQuantity,
                     TriggeredAt = r.TriggeredAt,
                     Status = r.Status
                 })
