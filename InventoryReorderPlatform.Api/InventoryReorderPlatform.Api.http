@@ -286,7 +286,8 @@ Authorization: Bearer {{viewerLogin.response.body.$.accessToken}}
   "name": "Unauthorized Test Item",
   "sku": "AUTH-0001",
   "quantityOnHand": 10,
-  "reorderThreshold": 5
+  "reorderThreshold": 5,
+  "reorderQuantity": 10
 }
 
 ###
@@ -323,6 +324,7 @@ Authorization: Bearer {{adminLogin.response.body.$.accessToken}}
 // - id: 1
 // - status: Active
 // - quantityOnHand: 20
+// - reorderQuantity: 10
 // - No reorder event is created
 
 POST {{InventoryReorderPlatform.Api_HostAddress}}/api/inventoryitems
@@ -333,7 +335,8 @@ Authorization: Bearer {{operatorLogin.response.body.$.accessToken}}
   "name": "Mechanical Keyboard",
   "sku": "KEY-1001",
   "quantityOnHand": 20,
-  "reorderThreshold": 5
+  "reorderThreshold": 5,
+  "reorderQuantity": 10
 }
 
 ###
@@ -360,6 +363,7 @@ Authorization: Bearer {{adminLogin.response.body.$.accessToken}}
 // - id: 2
 // - status: ReorderPending
 // - quantityOnHand: 3
+// - reorderQuantity: 20
 // - One reorder event is created
 // - One Service Bus message is published
 // - Response X-Correlation-Id matches initialReorderCorrelationId
@@ -378,7 +382,8 @@ X-Correlation-Id: {{initialReorderCorrelationId}}
   "name": "USB-C Docking Station",
   "sku": "DOCK-2001",
   "quantityOnHand": 3,
-  "reorderThreshold": 5
+  "reorderThreshold": 5,
+  "reorderQuantity": 20
 }
 
 ###
@@ -466,6 +471,7 @@ Authorization: Bearer {{viewerLogin.response.body.$.accessToken}}
 // - One event
 // - inventoryItemId: 2
 // - quantityAtTrigger: 3
+// - requestedQuantity: 20
 // - status eventually becomes Processed
 
 GET {{InventoryReorderPlatform.Api_HostAddress}}/api/reorderevents
@@ -508,7 +514,8 @@ Authorization: Bearer {{viewerLogin.response.body.$.accessToken}}
   "name": "Mechanical Keyboard",
   "sku": "KEY-1001",
   "quantityOnHand": 4,
-  "reorderThreshold": 5
+  "reorderThreshold": 5,
+  "reorderQuantity": 10
 }
 
 ###
@@ -570,7 +577,8 @@ X-Correlation-Id: {{transitionReorderCorrelationId}}
   "name": "Mechanical Keyboard",
   "sku": "KEY-1001",
   "quantityOnHand": 4,
-  "reorderThreshold": 5
+  "reorderThreshold": 5,
+  "reorderQuantity": 10
 }
 
 ###
@@ -593,6 +601,8 @@ Authorization: Bearer {{viewerLogin.response.body.$.accessToken}}
 // - Two total reorder events
 // - One event for item 1
 // - One event for item 2
+// - item 2 quantityAtTrigger: 4
+// - item 2 requestedQuantity: 10
 // - Both eventually become Processed
 
 GET {{InventoryReorderPlatform.Api_HostAddress}}/api/reorderevents
@@ -643,8 +653,10 @@ Authorization: Bearer {{adminLogin.response.body.$.accessToken}}
 // Expected:
 // - 200 OK
 // - quantityOnHand changes to 2
+// - configured reorderQuantity changes from 10 to 24
 // - status remains ReorderPending
-// - No additional reorder event is created
+// - no additional reorder event is created
+// - the existing event retains requestedQuantity: 10
 
 PUT {{InventoryReorderPlatform.Api_HostAddress}}/api/inventoryitems/{{activeItemId}}
 Content-Type: application/json
@@ -654,7 +666,8 @@ Authorization: Bearer {{operatorLogin.response.body.$.accessToken}}
   "name": "Mechanical Keyboard",
   "sku": "KEY-1001",
   "quantityOnHand": 2,
-  "reorderThreshold": 5
+  "reorderThreshold": 5,
+  "reorderQuantity": 24
 }
 
 ###
@@ -672,7 +685,9 @@ Authorization: Bearer {{viewerLogin.response.body.$.accessToken}}
 ###
 
 // Verify no duplicate reorder event was created
-// Expected: Still two total reorder events
+// Expected:
+// - Still two total reorder events
+// - Mechanical Keyboard reorder event still has requestedQuantity: 10
 
 GET {{InventoryReorderPlatform.Api_HostAddress}}/api/reorderevents
 Accept: application/json
@@ -729,7 +744,8 @@ Authorization: Bearer {{operatorLogin.response.body.$.accessToken}}
   "name": "Mechanical Keyboard",
   "sku": "KEY-1001",
   "quantityOnHand": 12,
-  "reorderThreshold": 5
+  "reorderThreshold": 5,
+  "reorderQuantity": 24
 }
 
 ###
@@ -802,7 +818,8 @@ Authorization: Bearer {{adminLogin.response.body.$.accessToken}}
   "name": "Mechanical Keyboard",
   "sku": "KEY-1001",
   "quantityOnHand": 15,
-  "reorderThreshold": 5
+  "reorderThreshold": 5,
+  "reorderQuantity": 24
 }
 
 ###
@@ -864,7 +881,8 @@ Authorization: Bearer {{operatorLogin.response.body.$.accessToken}}
   "name": "Invalid Inventory Item",
   "sku": "INVALID-0001",
   "quantityOnHand": -1,
-  "reorderThreshold": 5
+  "reorderThreshold": 5,
+  "reorderQuantity": 10
 }
 
 ###
@@ -883,7 +901,8 @@ Authorization: Bearer {{operatorLogin.response.body.$.accessToken}}
   "name": "Invalid Threshold Item",
   "sku": "INVALID-0002",
   "quantityOnHand": 10,
-  "reorderThreshold": -1
+  "reorderThreshold": -1,
+  "reorderQuantity": 10
 }
 
 ###
@@ -902,7 +921,29 @@ Authorization: Bearer {{operatorLogin.response.body.$.accessToken}}
   "name": "",
   "sku": "",
   "quantityOnHand": 10,
-  "reorderThreshold": 5
+  "reorderThreshold": 5,
+  "reorderQuantity": 10
+}
+
+###
+
+// Submit an invalid zero reorder quantity
+//
+// Expected:
+// - 400 Bad Request
+// - Validation identifies reorderQuantity
+// - No item or audit record is created
+
+POST {{InventoryReorderPlatform.Api_HostAddress}}/api/inventoryitems
+Content-Type: application/json
+Authorization: Bearer {{operatorLogin.response.body.$.accessToken}}
+
+{
+  "name": "Invalid Reorder Quantity Item",
+  "sku": "INVALID-0003",
+  "quantityOnHand": 10,
+  "reorderThreshold": 5,
+  "reorderQuantity": 0
 }
 
 ###
@@ -941,12 +982,14 @@ Authorization: Bearer {{adminLogin.response.body.$.accessToken}}
 // - Mechanical Keyboard
 // - quantityOnHand: 15
 // - reorderThreshold: 5
+// - reorderQuantity: 24
 // - status: Active
 //
 // Expected item 2:
 // - USB-C Docking Station
 // - quantityOnHand: 3
 // - reorderThreshold: 5
+// - reorderQuantity: 20
 // - status: ReorderPending
 
 GET {{InventoryReorderPlatform.Api_HostAddress}}/api/inventoryitems
