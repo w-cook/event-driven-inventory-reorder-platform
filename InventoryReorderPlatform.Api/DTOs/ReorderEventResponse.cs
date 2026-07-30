@@ -9,6 +9,7 @@ namespace InventoryReorderPlatform.Api.DTOs
         public int InventoryItemId { get; set; }
         public InventoryItem? InventoryItem { get; set; }
         public int QuantityAtTrigger { get; set; }
+        public int RequestedQuantity { get; set; }
         public DateTime TriggeredAt { get; set; } = DateTime.UtcNow;
         public string Status { get; set; } = string.Empty;
     }

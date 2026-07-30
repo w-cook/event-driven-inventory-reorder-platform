@@ -59,6 +59,7 @@ namespace InventoryReorderPlatform.Api.Controllers
                     Sku = i.Sku,
                     QuantityOnHand = i.QuantityOnHand,
                     ReorderThreshold = i.ReorderThreshold,
+                    ReorderQuantity = i.ReorderQuantity,
                     Status = i.Status,
                     CreatedAt = i.CreatedAt,
                     UpdatedAt = i.UpdatedAt
@@ -78,6 +79,7 @@ namespace InventoryReorderPlatform.Api.Controllers
                 Sku = request.Sku.Trim(),
                 QuantityOnHand = request.QuantityOnHand,
                 ReorderThreshold = request.ReorderThreshold,
+                ReorderQuantity = request.ReorderQuantity,
                 Status = "Active",
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
@@ -99,6 +101,7 @@ namespace InventoryReorderPlatform.Api.Controllers
                     inventoryItem.Sku,
                     inventoryItem.QuantityOnHand,
                     inventoryItem.ReorderThreshold,
+                    inventoryItem.ReorderQuantity,
                     inventoryItem.Status,
                     ReorderEventCreated = newReorderEvent != null
                 },
@@ -145,6 +148,7 @@ namespace InventoryReorderPlatform.Api.Controllers
                 inventoryItem.Sku,
                 inventoryItem.QuantityOnHand,
                 inventoryItem.ReorderThreshold,
+                inventoryItem.ReorderQuantity,
                 inventoryItem.Status
             };
 
@@ -152,6 +156,7 @@ namespace InventoryReorderPlatform.Api.Controllers
             inventoryItem.Sku = request.Sku.Trim();
             inventoryItem.QuantityOnHand = request.QuantityOnHand;
             inventoryItem.ReorderThreshold = request.ReorderThreshold;
+            inventoryItem.ReorderQuantity = request.ReorderQuantity;
 
             var newReorderEvent = await ApplyInventoryStatusWorkflowAsync(inventoryItem);
 
@@ -174,6 +179,7 @@ namespace InventoryReorderPlatform.Api.Controllers
                         inventoryItem.Sku,
                         inventoryItem.QuantityOnHand,
                         inventoryItem.ReorderThreshold,
+                        inventoryItem.ReorderQuantity,
                         inventoryItem.Status
                     },
                     ReorderEventCreated = newReorderEvent != null
@@ -229,6 +235,7 @@ namespace InventoryReorderPlatform.Api.Controllers
                 {
                     InventoryItemId = inventoryItem.Id,
                     QuantityAtTrigger = inventoryItem.QuantityOnHand,
+                    RequestedQuantity = inventoryItem.ReorderQuantity,
                     TriggeredAt = DateTime.UtcNow,
                     Status = "Pending"
                 };
@@ -250,6 +257,7 @@ namespace InventoryReorderPlatform.Api.Controllers
                 InventoryItemId = inventoryItem.Id,
                 Sku = inventoryItem.Sku,
                 QuantityAtTrigger = reorderEvent.QuantityAtTrigger,
+                RequestedQuantity = reorderEvent.RequestedQuantity,
                 TriggeredAt = reorderEvent.TriggeredAt
             });
         }
@@ -263,6 +271,7 @@ namespace InventoryReorderPlatform.Api.Controllers
                 Sku = inventoryItem.Sku,
                 QuantityOnHand = inventoryItem.QuantityOnHand,
                 ReorderThreshold = inventoryItem.ReorderThreshold,
+                ReorderQuantity = inventoryItem.ReorderQuantity,
                 Status = inventoryItem.Status,
                 CreatedAt = inventoryItem.CreatedAt,
                 UpdatedAt = inventoryItem.UpdatedAt

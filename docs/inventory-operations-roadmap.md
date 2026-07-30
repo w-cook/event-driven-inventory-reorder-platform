@@ -22,6 +22,17 @@ This expansion focuses on production-readiness concerns that commonly appear in 
 - operational documentation
 - higher-value automated tests
 
+## Phase Completion Standard
+
+Beginning with Phase 7, every phase concludes with a documentation review so that the `master` branch accurately represents the project after each merge.
+
+The final step of each phase must:
+
+- update all affected project documentation to match the completed implementation
+- revise any outdated setup, architecture, workflow, testing, or limitation descriptions
+- add or refresh screenshots whenever the frontend has changed
+- verify that README and portfolio-facing claims remain accurate and defensible
+
 ## Planned Scope
 
 ### Phase 1 — Operations Dashboard Foundation
@@ -90,16 +101,17 @@ This expansion focuses on production-readiness concerns that commonly appear in 
 
 ### Phase 7 — Reorder Quantity and Inventory Configuration
 
-- [ ] add a configured reorder quantity to inventory items
-- [ ] copy the reorder quantity into each reorder event when triggered
-- [ ] include the requested reorder quantity in `ReorderRequestedMessage`
-- [ ] persist the requested quantity independently of later inventory changes
-- [ ] update create and edit request validation
-- [ ] add the required EF Core migration
-- [ ] update API responses and frontend types
-- [ ] display requested reorder quantities in workflow views
-- [ ] extend processor and workflow tests for the new field
-- [ ] clearly distinguish requested reorder quantity from stock received
+- [x] add a configured reorder quantity to inventory items
+- [x] copy the reorder quantity into each reorder event when triggered
+- [x] include the requested reorder quantity in `ReorderRequestedMessage`
+- [x] persist the requested quantity independently of later inventory changes
+- [x] update create and edit request validation
+- [x] add the required EF Core migration
+- [x] update API responses and frontend types
+- [x] display requested reorder quantities in workflow views
+- [x] extend processor and workflow tests for the new field
+- [x] clearly distinguish requested reorder quantity from stock received
+- [x] update all affected documentation and refresh screenshots where the frontend changed
 
 ### Phase 8 — Privileged Operations and Administration UI
 
@@ -117,6 +129,7 @@ Several authentication and account-administration interface items originally pla
 - [ ] clear handling of expired, unauthorized, and forbidden sessions
 - [ ] refresh affected dashboard data after successful inventory mutations
 - [ ] frontend tests for role-aware behavior where practical
+- [ ] update all affected documentation and refresh screenshots where the frontend changed
 
 
 ### Phase 9 — Frontend Information Architecture and UX Polish
@@ -129,7 +142,7 @@ Several authentication and account-administration interface items originally pla
 - [ ] add accessible labels, focus behavior, and keyboard navigation
 - [ ] improve role and session visibility
 - [ ] verify the interface at common desktop and narrow-screen widths
-- [ ] refresh screenshots after the final layout is complete
+- [ ] update all affected documentation and refresh screenshots where the frontend changed
 
 ### Phase 10 — Complete API Documentation and Final Verification
 

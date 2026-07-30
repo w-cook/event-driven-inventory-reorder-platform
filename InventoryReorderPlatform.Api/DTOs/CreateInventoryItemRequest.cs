@@ -19,5 +19,9 @@ namespace InventoryReorderPlatform.Api.DTOs
         [Required]
         [Range(0, int.MaxValue)]
         public int ReorderThreshold { get; set; }
+
+        [Required]
+        [Range(1, int.MaxValue)]
+        public int ReorderQuantity { get; set; }
     }
 }

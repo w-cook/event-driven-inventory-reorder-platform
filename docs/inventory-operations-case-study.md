@@ -22,6 +22,7 @@ A React/TypeScript dashboard provides:
 - signed-in identity and role visibility
 - inventory items and low-stock conditions
 - reorder state and processing history
+- configured reorder quantities and per-event requested-quantity snapshots
 - workflow summaries
 - application and database health
 - Administrator-only application-account management
@@ -57,6 +58,21 @@ The API uses policy-based authorization to enforce three operational roles:
 - `Administrator` can perform operational actions, inspect the audit trail, and manage application accounts.
 
 Role-aware rendering in the React client improves usability, but the API remains the security boundary. Viewer and Operator sessions do not call the Administrator-only accounts endpoint, and direct unauthorized requests are still rejected by backend policy enforcement.
+
+### Reorder Configuration and Workflow Snapshots
+
+Each inventory item now stores a positive configured `ReorderQuantity` in addition to its current stock and reorder threshold.
+
+When the item enters `ReorderPending`, the API copies that configuration into the new reorder event as `RequestedQuantity`. The same value is included in `ReorderRequestedMessage` and carried through background processing.
+
+This creates a deliberate distinction between mutable inventory configuration and historical workflow state:
+
+- changing `ReorderQuantity` affects future reorder requests
+- existing reorder events retain the quantity originally requested
+- duplicate delivery and processing recovery continue using the original snapshot
+- processing the request does not increase physical stock
+
+This design prevents later configuration changes from silently rewriting business history and keeps the event, message, and persisted processing result aligned.
 
 ### Administrator Account Management
 
@@ -148,6 +164,9 @@ The current xUnit v3 tests verify that:
 - failed processing creates a persisted failure record with payload and attempt information
 - correlation middleware generates an identifier when one is absent and preserves a caller-supplied identifier when one is provided
 - an isolated API-to-Processor workflow test exercises the cross-component business path
+- positive reorder-quantity validation
+- requested-quantity propagation across API, message, Processor, and persistence boundaries
+- historical snapshot preservation after later inventory configuration changes
 
 Direct Worker settlement tests are not currently included because the Worker depends on concrete Azure Service Bus transport types. Adding a separate transport abstraction solely for those tests would add more complexity than the current scope requires.
 
@@ -163,7 +182,7 @@ The Aspire-oriented workflow:
 2. creates Viewer and Operator test accounts
 3. logs in as those accounts
 4. reuses named-response access tokens for role-specific requests
-5. verifies authorization, inventory changes, audit records, reorder processing, and health behavior from top to bottom
+5. verifies authorization, configured reorder quantities, immutable workflow snapshots, inventory changes, audit records, reorder processing, and health behavior from top to bottom
 
 Credential values are resolved through ASP.NET Core User Secrets and are not stored in the repository.
 
@@ -201,5 +220,6 @@ This expansion demonstrates practical backend engineering concerns that transfer
 - production-oriented automated testing
 - authenticated frontend visibility for backend systems
 - maintainable and accurately scoped documentation
+- mutable configuration versus immutable workflow-snapshot modeling
 
 The expansion strengthens the project as evidence of practical C#/.NET backend and business-application development while keeping its limitations and claims fully defensible.

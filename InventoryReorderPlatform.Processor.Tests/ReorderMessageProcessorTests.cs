@@ -21,6 +21,7 @@ public class ReorderMessageProcessorTests
             Id = 1,
             InventoryItemId = 10,
             QuantityAtTrigger = 3,
+            RequestedQuantity = 12,
             TriggeredAt = DateTime.UtcNow,
             Status = "Pending"
         };
@@ -39,6 +40,7 @@ public class ReorderMessageProcessorTests
             InventoryItemId = reorderEvent.InventoryItemId,
             Sku = "TEST-001",
             QuantityAtTrigger = reorderEvent.QuantityAtTrigger,
+            RequestedQuantity = reorderEvent.RequestedQuantity,
             TriggeredAt = reorderEvent.TriggeredAt
         };
 
@@ -60,6 +62,10 @@ public class ReorderMessageProcessorTests
             await dbContext.ReorderEvents.SingleAsync(cancellationToken);
 
         Assert.Equal("Processed", savedReorderEvent.Status);
+
+        Assert.Equal(
+            message.RequestedQuantity,
+            savedReorderEvent.RequestedQuantity);
 
         var processedMessage =
             await dbContext.ProcessedMessages.SingleAsync(cancellationToken);
@@ -89,6 +95,7 @@ public class ReorderMessageProcessorTests
             Id = 1,
             InventoryItemId = 10,
             QuantityAtTrigger = 3,
+            RequestedQuantity = 12,
             TriggeredAt = DateTime.UtcNow,
             Status = "Pending"
         };
@@ -106,6 +113,7 @@ public class ReorderMessageProcessorTests
             InventoryItemId = reorderEvent.InventoryItemId,
             Sku = "TEST-001",
             QuantityAtTrigger = reorderEvent.QuantityAtTrigger,
+            RequestedQuantity = reorderEvent.RequestedQuantity,
             TriggeredAt = reorderEvent.TriggeredAt
         };
 
@@ -142,6 +150,9 @@ public class ReorderMessageProcessorTests
 
         Assert.Single(reorderEvents);
         Assert.Equal("Processed", reorderEvents[0].Status);
+        Assert.Equal(
+            message.RequestedQuantity,
+            reorderEvents[0].RequestedQuantity);
 
         Assert.Single(processedMessages);
         Assert.Equal(messageId, processedMessages[0].MessageId);
@@ -166,6 +177,7 @@ public class ReorderMessageProcessorTests
             InventoryItemId = 10,
             Sku = "MISSING-001",
             QuantityAtTrigger = 3,
+            RequestedQuantity = 12,
             TriggeredAt = DateTime.UtcNow
         };
 
@@ -233,6 +245,7 @@ public class ReorderMessageProcessorTests
             InventoryItemId = 10,
             Sku = "RECOVERY-001",
             QuantityAtTrigger = 3,
+            RequestedQuantity = 12,
             TriggeredAt = triggeredAt
         };
 
@@ -264,6 +277,7 @@ public class ReorderMessageProcessorTests
                 Id = message.ReorderEventId,
                 InventoryItemId = message.InventoryItemId,
                 QuantityAtTrigger = message.QuantityAtTrigger,
+                RequestedQuantity = message.RequestedQuantity,
                 TriggeredAt = message.TriggeredAt,
                 Status = "Pending"
             });
@@ -289,6 +303,10 @@ public class ReorderMessageProcessorTests
         Assert.Equal(
             "Processed",
             reorderEvent.Status);
+
+        Assert.Equal(
+            message.RequestedQuantity,
+            reorderEvent.RequestedQuantity);
 
         var processedMessage =
             await dbContext.ProcessedMessages

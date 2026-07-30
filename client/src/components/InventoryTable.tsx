@@ -26,6 +26,7 @@ export function InventoryTable({ items }: Props) {
               <th>Name</th>
               <th>Quantity</th>
               <th>Reorder Threshold</th>
+              <th>Reorder Quantity</th>
               <th>Status</th>
             </tr>
           </thead>
@@ -44,6 +45,7 @@ export function InventoryTable({ items }: Props) {
                   <td>{item.name}</td>
                   <td>{item.quantityOnHand}</td>
                   <td>{item.reorderThreshold}</td>
+                  <td>{item.reorderQuantity}</td>
                   <td>
                     <span className={lowStock ? 'badge warning' : 'badge ok'}>
                       {statusLabel}

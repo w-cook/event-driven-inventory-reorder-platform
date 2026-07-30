@@ -53,6 +53,12 @@ export function ReorderWorkflowPanel({
     <section className="card">
       <h2>Reorder Workflow</h2>
 
+      <p className="muted">
+        Requested quantity is captured when the reorder workflow begins. A processed
+        event means the request was handled; it does not mean replacement stock has
+        been received.
+      </p>
+
       <div className="table-wrapper">
         <table>
           <thead>
@@ -61,6 +67,7 @@ export function ReorderWorkflowPanel({
               <th>SKU</th>
               <th>Status</th>
               <th>Quantity at Trigger</th>
+              <th>Requested Quantity</th>
               <th>Triggered</th>
             </tr>
           </thead>
@@ -81,6 +88,7 @@ export function ReorderWorkflowPanel({
                     </span>
                   </td>
                   <td>{event.quantityAtTrigger}</td>
+                  <td>{event.requestedQuantity}</td>
                   <td>
                     {new Date(event.triggeredAt).toLocaleString()}
                   </td>

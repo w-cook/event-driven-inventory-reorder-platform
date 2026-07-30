@@ -73,9 +73,9 @@ The React and TypeScript client provides:
 - authenticated login and logout
 - in-memory JWT access-token handling
 - signed-in user and role visibility
-- inventory quantities and status
+- current stock, reorder thresholds, configured reorder quantities, and status
 - low-stock filtering
-- reorder-processing history
+- reorder-processing history with quantity-at-trigger and requested-quantity snapshots
 - application and database health
 - Administrator-only account listing, creation, role changes, deactivation, and reactivation
 
@@ -102,6 +102,8 @@ The API is responsible for:
 - preventing the final active Administrator from being demoted or deactivated
 - validating inventory requests
 - managing inventory and reorder state
+- validating positive configured reorder quantities
+- copying the configured reorder quantity into each new reorder event and message
 - recording successful inventory and account-management actions in the audit trail
 - creating stable reorder messages
 - propagating correlation and trace context
@@ -109,6 +111,8 @@ The API is responsible for:
 JWT access tokens contain the authenticated account identity, assigned roles, and the Identity security stamp. Role and activation changes update the security stamp, causing previously issued tokens for that account to fail validation immediately.
 
 When an item enters a low-stock state, the API saves the business state before publishing the corresponding reorder message.
+
+The API copies the inventory item’s current `ReorderQuantity` into the new reorder event as `RequestedQuantity`. The message is built from that event snapshot rather than reading mutable inventory configuration again.
 
 ### Authentication and Authorization Boundary
 
@@ -127,6 +131,8 @@ Authorization remains enforced by the API. Hiding Administrator controls in the 
 ### Message Queue
 
 The Azure Service Bus-compatible queue separates the inventory request from background reorder processing.
+
+Each `ReorderRequestedMessage` carries the requested quantity captured by the originating reorder event.
 
 The platform assumes at-least-once delivery. Stable message identifiers and a SQL-backed processed-message ledger make duplicate delivery harmless.
 
@@ -152,8 +158,8 @@ A `Processed` reorder event represents successful internal handling of the reord
 SQL Server stores the application’s durable state:
 
 - ASP.NET Core Identity users, roles, claims, and account security data
-- inventory items
-- reorder events
+- inventory items, including current reorder configuration
+- reorder events, including immutable requested-quantity snapshots
 - reorder status history
 - audit records
 - successfully processed message identifiers
