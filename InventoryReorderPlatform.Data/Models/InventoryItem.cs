@@ -24,6 +24,10 @@ namespace InventoryReorderPlatform.Data.Models
         public int ReorderThreshold { get; set; }
 
         [Required]
+        [Display(Name = "Reorder Quantity")]
+        public int ReorderQuantity { get; set; }
+
+        [Required]
         [StringLength(20)]
         public string Status { get; set; } = string.Empty;
 

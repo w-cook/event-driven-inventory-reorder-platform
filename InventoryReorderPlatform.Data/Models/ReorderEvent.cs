@@ -18,6 +18,10 @@ namespace InventoryReorderPlatform.Data.Models
         [Display(Name = "Quantity At Trigger")]
         public int QuantityAtTrigger { get; set; }
 
+        [Required]
+        [Display(Name = "Requested Quantity")]
+        public int RequestedQuantity { get; set; }
+
         [Display(Name = "Triggered At")]
         public DateTime TriggeredAt { get; set; } = DateTime.UtcNow;
 
