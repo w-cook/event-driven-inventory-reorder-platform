@@ -10,6 +10,7 @@ import { listInventoryItems } from './api/inventoryItems'
 import { listReorderEvents } from './api/reorderEvents'
 import { getSystemHealth } from './api/systemHealth'
 import { AccountManagementPanel } from './components/AccountManagementPanel'
+import { InventoryItemForm } from './components/InventoryItemForm'
 import { InventorySummaryCards } from './components/InventorySummaryCards'
 import { InventoryTable } from './components/InventoryTable'
 import { LoginForm } from './components/LoginForm'
@@ -26,6 +27,7 @@ function App() {
   const [sessionNotice, setSessionNotice] = useState('')
 
   const [items, setItems] = useState<InventoryItem[]>([])
+  const [editingItem, setEditingItem] = useState<InventoryItem | null>(null)
   const [reorderEvents, setReorderEvents] = useState<ReorderEvent[]>([])
   const [showLowStockOnly, setShowLowStockOnly] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
@@ -51,6 +53,7 @@ function App() {
 
       setSession(null)
       setItems([])
+      setEditingItem(null)
       setReorderEvents([])
       setSystemHealth(null)
 
@@ -152,6 +155,7 @@ function App() {
     setSession(null)
 
     setItems([])
+    setEditingItem(null)
     setReorderEvents([])
     setSystemHealth(null)
 
@@ -188,6 +192,31 @@ function App() {
 
   const isAdministrator =
     session.roles.includes('Administrator')
+
+  const canManageInventory =
+    session.roles.includes('Operator') ||
+    isAdministrator
+
+  function handleInventorySaved(
+    savedItem: InventoryItem,
+    wasCreated: boolean,
+  ) {
+    setItems(currentItems => {
+      if (wasCreated) {
+        return [savedItem, ...currentItems]
+      }
+
+      return currentItems.map(item =>
+        item.id === savedItem.id
+          ? savedItem
+          : item,
+      )
+    })
+
+    if (!wasCreated) {
+      setEditingItem(savedItem)
+    }
+  }
 
   return (
     <main className="page">
@@ -240,7 +269,20 @@ function App() {
         </label>
       </section>
 
-      <InventoryTable items={visibleItems} />
+      <InventoryTable
+        items={visibleItems}
+        canManageInventory={canManageInventory}
+        onEdit={setEditingItem}
+      />
+
+      {canManageInventory && (
+        <InventoryItemForm
+          key={editingItem?.id ?? 'create'}
+          itemToEdit={editingItem}
+          onSaved={handleInventorySaved}
+          onCancelEdit={() => setEditingItem(null)}
+        />
+      )}
 
       <section className="grid">
         <ReorderWorkflowPanel

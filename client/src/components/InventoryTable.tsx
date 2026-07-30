@@ -2,9 +2,15 @@ import { isLowStock, type InventoryItem } from '../types/inventoryItem'
 
 interface Props {
   items: InventoryItem[]
+  canManageInventory: boolean
+  onEdit: (item: InventoryItem) => void
 }
 
-export function InventoryTable({ items }: Props) {
+export function InventoryTable({
+  items,
+  canManageInventory,
+  onEdit,
+}: Props) {
   if (items.length === 0) {
     return (
       <section className="card">
@@ -28,6 +34,7 @@ export function InventoryTable({ items }: Props) {
               <th>Reorder Threshold</th>
               <th>Reorder Quantity</th>
               <th>Status</th>
+              {canManageInventory && <th>Actions</th>}
             </tr>
           </thead>
 
@@ -51,6 +58,17 @@ export function InventoryTable({ items }: Props) {
                       {statusLabel}
                     </span>
                   </td>
+                  {canManageInventory && (
+                    <td>
+                      <button
+                        type="button"
+                        className="table-action-button"
+                        onClick={() => onEdit(item)}
+                      >
+                        Edit
+                      </button>
+                    </td>
+                  )}
                 </tr>
               )
             })}
