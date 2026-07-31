@@ -56,6 +56,7 @@ body {
 }
 
 .card {
+  min-width: 0;
   background: white;
   color: #172033;
   border: 1px solid #dde3ee;
@@ -109,6 +110,9 @@ body {
 }
 
 .table-wrapper {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
   overflow-x: auto;
 }
 
@@ -598,6 +602,7 @@ button:disabled {
 
 .app-view {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 1rem;
 }
 
