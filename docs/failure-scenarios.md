@@ -66,11 +66,13 @@ A protected request has no bearer token, has an expired token, or provides a tok
 
 The API returns `401 Unauthorized`.
 
-A valid token held by a role that lacks access to the requested operation instead receives `403 Forbidden`.
+When the React client receives that response for an authenticated request, it clears the in-memory token and application state, returns to the login form, and displays a session-invalidated notice.
+
+A valid token held by a role that lacks access to the requested operation instead receives `403 Forbidden`. The client keeps the session active and displays a readable permission message.
 
 ### Recovery
 
-Authenticate again and retry the request with the returned access token. A forbidden response requires an Administrator to review the account’s assigned role rather than simply retrying the same token.
+Authenticate again after a `401` response and retry with the newly issued token. A `403` response requires an Administrator to review the account’s assigned role rather than simply retrying the same token.
 
 ## Final Administrator Safeguard
 
@@ -103,6 +105,22 @@ Account creation uses established ASP.NET Core Identity validation and password 
 ### Recovery
 
 Use a unique email address, a supported application role, and a password that satisfies the documented policy.
+
+## Invalid Inventory Mutation
+
+### Scenario
+
+An Operator or Administrator submits missing or invalid inventory values, such as a non-positive configured reorder quantity.
+
+### Current Behavior
+
+The API rejects the request without committing a partial inventory change or starting a reorder workflow.
+
+The React form preserves the user’s input and displays validation details returned by the API. Failed requests do not replace the current dashboard data with speculative client state.
+
+### Recovery
+
+Correct the reported inventory values and resubmit the request.
 
 ## Duplicate Reorder Message
 

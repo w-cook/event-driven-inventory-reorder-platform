@@ -2,25 +2,13 @@
 
 ## Purpose
 
-This phase expands the Event-Driven Inventory Reorder Platform from a backend/event-driven workflow demo into a more production-oriented inventory operations system.
+This roadmap tracks the expansion of the Event-Driven Inventory Reorder Platform from a backend workflow demo into a more production-oriented internal operations system.
 
-The goal is to demonstrate practical backend reliability, role-aware operations, observability, and an operator-facing dashboard while preserving the original event-driven architecture.
+The work preserves the original event-driven architecture while adding operator visibility, role-aware workflows, reliability controls, observability, automated verification, and employer-facing documentation.
 
-## Why This Expansion Exists
+## Current Status
 
-The original project demonstrated API and background processor separation, SQL-backed workflow state, Docker-based local development, and queue-based reorder processing.
-
-This expansion focuses on production-readiness concerns that commonly appear in real backend systems:
-
-- operator visibility
-- role-based access
-- idempotent message handling
-- failed processing recovery
-- structured logging
-- correlation identifiers
-- health/readiness checks
-- operational documentation
-- higher-value automated tests
+Phases 1–8 are complete. Phase 9 covers frontend information architecture and UX polish; Phase 10 covers complete API documentation and final verification.
 
 ## Phase Completion Standard
 
@@ -98,7 +86,6 @@ The final step of each phase must:
 - [x] Administrator account-management interface
 - [x] update the structured `.http` verification workflow for real JWT authentication
 
-
 ### Phase 7 — Reorder Quantity and Inventory Configuration
 
 - [x] add a configured reorder quantity to inventory items
@@ -115,22 +102,19 @@ The final step of each phase must:
 
 ### Phase 8 — Privileged Operations and Administration UI
 
-Several authentication and account-administration interface items originally planned for this phase were completed early as part of Phase 6 and are marked accordingly below.
-
 - [x] frontend login and logout workflow
 - [x] authenticated API client using JWT bearer tokens
-- [x] role-aware navigation and action visibility
-- [ ] Operator and Administrator inventory quantity updates
-- [ ] inventory create and edit forms
-- [ ] validation and API error handling for inventory mutations
-- [ ] Administrator audit-record view
+- [x] role-aware panel and action visibility
+- [x] Operator and Administrator inventory quantity updates
+- [x] inventory create and edit forms
+- [x] validation and API error handling for inventory mutations
+- [x] Administrator audit-record view
 - [x] Administrator user-account management view
 - [x] account creation, role management, and account activation controls
-- [ ] clear handling of expired, unauthorized, and forbidden sessions
-- [ ] refresh affected dashboard data after successful inventory mutations
-- [ ] frontend tests for role-aware behavior where practical
-- [ ] update all affected documentation and refresh screenshots where the frontend changed
-
+- [x] clear handling of expired or invalidated sessions and forbidden actions
+- [x] refresh affected dashboard data after successful inventory mutations
+- [x] verify Viewer, Operator, Administrator, and invalidated-session behavior through a manual role matrix supported by API authorization integration tests
+- [x] update all affected documentation and refresh screenshots where the frontend changed
 
 ### Phase 9 — Frontend Information Architecture and UX Polish
 
@@ -158,7 +142,6 @@ Several authentication and account-administration interface items originally pla
 - [ ] run the full automated test suite
 - [ ] verify both Aspire and Docker/local runtime modes
 - [ ] complete a final README, screenshots, and portfolio-claims review
-
 
 ## Non-Goals
 

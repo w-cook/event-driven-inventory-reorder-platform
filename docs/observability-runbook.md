@@ -61,26 +61,37 @@ If an account role or activation state changes, any token issued before that cha
 
 ## Trigger a Correlated Reorder Workflow
 
-Use one of the existing authenticated requests that causes an inventory item to enter `ReorderPending`.
+Trigger a workflow through either the React client or the structured request file.
 
-The message-producing requests include explicit correlation headers such as:
+### React client
+
+1. Sign in as an Operator or Administrator.
+2. Create an item at or below its reorder threshold, or edit an active item so it crosses into a low-stock state.
+3. Note the resulting reorder event and requested quantity in the workflow panel.
+
+The browser request receives an API-generated correlation identifier unless a caller supplies one explicitly. Use the Aspire trace view or API logs to locate the corresponding inventory request.
+
+### Structured request file
+
+Use an authenticated request that causes an inventory item to enter `ReorderPending`. Message-producing requests include explicit correlation headers such as:
 
 ```http
 X-Correlation-Id: {{initialReorderCorrelationId}}
 Authorization: Bearer {{operatorLogin.response.body.$.accessToken}}
 ```
 
-The `.http` file assumes an empty database and top-to-bottom execution when using its fixed identifiers and expected counts.
+The `.http` workflow assumes an empty database and top-to-bottom execution when using fixed identifiers and expected counts.
 
 Confirm that:
 
-- the login request succeeded before the inventory request
+- authentication succeeds before the inventory request
 - the API request succeeds
-- the response includes the same `X-Correlation-Id`
-- a reorder event is created
-- the reorder event eventually becomes `Processed`
+- the response includes the expected `X-Correlation-Id`
+- a reorder event is created with the configured requested quantity
+- the event eventually becomes `Processed`
+- processing does not increase `QuantityOnHand`
 
-A `401 Unauthorized` response indicates a missing, expired, invalidated, or otherwise invalid token. A `403 Forbidden` response indicates that the authenticated account does not have the required role.
+A `401 Unauthorized` response indicates a missing, expired, invalidated, or otherwise invalid token. A `403 Forbidden` response indicates that the authenticated account lacks the required role.
 
 ## Search the API Logs
 
@@ -221,6 +232,25 @@ Confirm that the operations response reports:
 
 The React System Health panel performs this request with the current in-memory bearer token.
 
+## Verify Audit Records
+
+Sign in as an Administrator and open the Audit Records panel, or call:
+
+```http
+GET /api/audit-records
+Authorization: Bearer <administrator-access-token>
+```
+
+Confirm that a successful inventory creation or update produces a newest-first record containing:
+
+- acting user and role
+- inventory action
+- affected entity identifier
+- UTC occurrence time
+- action-specific details, including previous and current values for updates
+
+Account creation, role changes, and activation changes should produce corresponding records. Rejected authorization or validation attempts are not recorded as completed business actions.
+
 ## Verify Authentication and Account State
 
 ### Confirm login
@@ -316,7 +346,7 @@ Confirm that:
 
 In the `.http` file, rerun the appropriate named login request.
 
-In the React client, log out and sign in again. Page refresh already clears the in-memory session.
+In the React client, a rejected authenticated request clears the in-memory session and returns to the login form automatically. Sign in again after confirming the account is active and correctly assigned.
 
 ### Protected Request Returns 403
 

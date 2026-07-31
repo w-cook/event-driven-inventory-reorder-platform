@@ -22,13 +22,25 @@ The authenticated React/TypeScript dashboard combines inventory and workflow sum
 
 ![Inventory and reorder workflow quantity comparison](docs/images/reorder-workflow-quantities.png)
 
-Inventory items retain a configurable reorder quantity for future workflows, while each reorder event stores an independent requested-quantity snapshot. Later inventory configuration changes do not rewrite the quantity associated with an existing reorder request.
+Inventory items retain a configurable reorder quantity for future workflows, while each reorder event stores an independent requested-quantity snapshot. Later configuration changes do not rewrite an existing request. The adjacent System Health card shows API and database status, operational record counts, and the latest check time used during workflow verification.
 
 ### Low-Stock Review
 
 ![Inventory dashboard filtered to low-stock items](docs/images/inventory-low-stock-filter.png)
 
 The low-stock filter narrows the inventory table to items requiring attention while retaining their current quantity, reorder threshold, configured reorder quantity, and workflow context.
+
+### Privileged Inventory Management
+
+![Operator and Administrator inventory management interface](docs/images/inventory-management.png)
+
+Authenticated Operators and Administrators can create inventory items and edit current stock, reorder thresholds, and configured reorder quantities. Successful mutations refresh inventory summaries, workflow history, and system health from authoritative backend state.
+
+### Administrator Audit Review
+
+![Administrator audit-record review interface](docs/images/audit-records.png)
+
+Authenticated Administrators can review successful inventory and account-management actions, including the acting user and role, affected entity, occurrence time, and formatted action-specific details.
 
 ### Administrator Account Management
 
@@ -78,9 +90,11 @@ A processed reorder request remains distinct from receiving replacement stock. S
 
 - ASP.NET Core Web API design
 - ASP.NET Core Identity with persistent application accounts
-- signed JWT access tokens and bearer authentication
-- policy-based authorization and role-aware operations
+- signed JWT access tokens and policy-based role authorization
 - Administrator-controlled account and role management
+- role-aware React/TypeScript inventory operations
+- Administrator-facing audit-trail review
+- readable client handling for validation, forbidden, and invalidated-session responses
 - background processing with a .NET Worker Service
 - event-driven producer/consumer architecture
 - Entity Framework Core with SQL Server
@@ -89,9 +103,7 @@ A processed reorder request remains distinct from receiving replacement stock. S
 - reliable, idempotent message processing
 - retry and dead-letter behavior
 - SQL-backed audit, processing, and failure records
-- React/TypeScript operational visibility
-- structured logging and correlation identifiers
-- OpenTelemetry tracing through .NET Aspire
+- structured logging, correlation identifiers, and OpenTelemetry tracing through .NET Aspire
 - Docker-based local infrastructure
 - Azure-compatible messaging through the Azure Service Bus Emulator
 - production-oriented decisions without paid cloud infrastructure
@@ -102,21 +114,22 @@ A processed reorder request remains distinct from receiving replacement stock. S
 
 The React/TypeScript client provides:
 
-- authenticated login and logout
-- in-memory JWT access-token handling
+- authenticated login and logout with in-memory JWT handling
 - signed-in user and role visibility
 - inventory and workflow summary metrics
-- current stock, threshold, and configured reorder-quantity visibility
-- low-stock filtering
-- reorder-event processing history with trigger and requested-quantity snapshots
+- current stock, threshold, configured reorder quantity, and low-stock visibility
+- Operator and Administrator inventory-item creation and editing
+- reorder-event history with quantity-at-trigger and requested-quantity snapshots
+- automatic inventory, workflow, summary, and health refresh after mutations
 - application and database health information
-- Administrator-only account listing and creation
-- Administrator account role and activation controls
-- independent loading, success, empty, and error states
+- Administrator-only audit review with expandable details
+- Administrator account creation, role changes, and activation controls
+- independent loading, empty, success, and error states
+- automatic logout and a clear notice when a token is invalidated or rejected
 
-The dashboard consumes protected backend endpoints and does not duplicate inventory-status, authorization, or reorder-workflow business rules in the client. Viewer and Operator sessions remain isolated from Administrator-only account-management functionality.
+Viewer sessions remain read-only. Operator sessions receive inventory-management controls but do not render or request Administrator-only audit or account-management data. The API independently enforces every authorization boundary and all inventory/workflow business rules.
 
-Access tokens are intentionally retained only in frontend memory. Refreshing or closing the page clears the current session and requires another login. Refresh-token infrastructure and persistent browser sessions are outside the current project scope.
+Access tokens are retained only in frontend memory. Refreshing or closing the page clears the session and requires another login; refresh-token infrastructure and persistent browser sessions remain outside the project scope.
 
 ### Authentication, Authorization, and Audit Trail
 
@@ -570,7 +583,7 @@ Each document has a focused purpose:
 - [Observability runbook](docs/observability-runbook.md) — operational steps for tracing and diagnosing a workflow
 - [Frontend README](client/README.md) — client-specific startup, proxy configuration, environment settings, and scripts
 
-The operations dashboard, Identity/JWT authentication, authorization and auditing, reliable message processing, observability, production-oriented testing, and reorder-quantity configuration phases are complete. Remaining privileged-operation UI, interface-polish, and final API-documentation work is tracked in the roadmap.
+Phases 1–8 are complete: the project now includes the operations dashboard, Identity/JWT authentication, authorization and auditing, reliable message processing, observability, production-oriented testing, reorder-quantity configuration, and privileged operations UI. Frontend information-architecture polish and final API documentation remain tracked in the roadmap.
 
 ## Scope and Limitations
 
@@ -584,8 +597,8 @@ The operations dashboard, Identity/JWT authentication, authorization and auditin
 - persistent ASP.NET Core Identity application accounts
 - signed JWT access tokens and role-based authorization
 - Administrator-controlled account and role management
-- role-aware API operations
-- operator-facing dashboard visibility
+- role-aware API and frontend inventory operations
+- Administrator audit and account-management interfaces
 - local health, logs, metrics, and traces
 - configurable reorder quantities and immutable per-event requested-quantity snapshots
 - Aspire and Docker-based development modes
@@ -607,22 +620,9 @@ The operations dashboard, Identity/JWT authentication, authorization and auditin
 
 ## Portfolio Positioning
 
-This project demonstrates practical C#/.NET backend and distributed-system work through:
+This project is positioned primarily as evidence of practical C#/.NET backend and distributed-system work: authenticated ASP.NET Core APIs, SQL-backed business state, reliable queue processing, auditing, diagnostics, and automated integration tests.
 
-- an ASP.NET Core API producer
-- ASP.NET Core Identity and signed JWT bearer authentication
-- Administrator-controlled application-account lifecycle management
-- a background Worker consumer
-- SQL Server persistence
-- reliable queue-based processing
-- role-aware operations and SQL-backed auditing
-- an authenticated React operations dashboard
-- correlated logs and distributed tracing
-- Aspire and Docker local orchestration
-- Azure-compatible messaging
-- automated authentication, authorization, reliability, and middleware tests
-
-The implementation keeps its claims conservative and can be reproduced locally without paid cloud services.
+The React client demonstrates that those backend capabilities are usable through a role-aware internal business interface rather than existing only as isolated endpoints. Claims remain deliberately conservative, and the full system can be reproduced locally without paid cloud services.
 
 ## License
 

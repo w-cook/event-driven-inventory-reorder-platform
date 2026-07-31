@@ -73,17 +73,20 @@ The React and TypeScript client provides:
 - authenticated login and logout
 - in-memory JWT access-token handling
 - signed-in user and role visibility
-- current stock, reorder thresholds, configured reorder quantities, and status
+- current stock, reorder thresholds, configured reorder quantities, and backend-derived status
 - low-stock filtering
+- Operator and Administrator inventory-item creation and editing
 - reorder-processing history with quantity-at-trigger and requested-quantity snapshots
 - application and database health
+- Administrator-only audit-record review
 - Administrator-only account listing, creation, role changes, deactivation, and reactivation
+- readable validation, authorization, and invalidated-session handling
 
-Viewer and Operator sessions do not request or render Administrator-only account-management data.
+Viewer sessions use the dashboard as a read-only operational view. Operator and Administrator sessions can create and edit inventory items through protected API endpoints. Only Administrators render or request audit and account-management data, reducing unnecessary privileged requests without treating the client as the security boundary.
 
-The current client remains read-only for inventory operations. Inventory creation and quantity updates are available through the protected API and structured `.http` workflow and are planned for a later privileged-operations UI phase.
+After a successful inventory mutation, the client reloads inventory and reorder-event state and refreshes system health so the interface reflects authoritative backend results.
 
-The client does not duplicate backend inventory, workflow, authentication, or authorization rules. Access tokens are stored only in application memory, so refreshing or closing the page ends the current frontend session.
+The client does not duplicate backend inventory, workflow, authentication, or authorization rules. Access tokens are stored only in application memory, so refreshing or closing the page ends the current frontend session. A rejected or invalidated token clears the authenticated client state and returns the user to the login form.
 
 ### ASP.NET Core API
 
