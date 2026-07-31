@@ -310,6 +310,16 @@ button:disabled {
   font-size: 0.9rem;
 }
 
+.session-notice {
+  margin-top: 1rem;
+  border: 1px solid #bfdbfe;
+  border-radius: 0.75rem;
+  padding: 0.75rem 1rem;
+  background: #eff6ff;
+  color: #1e3a8a;
+  text-align: center;
+}
+
 .account-management {
   margin-top: 1rem;
 }
@@ -332,6 +342,55 @@ button:disabled {
 .account-management table {
   width: min(100%, 1100px);
   margin-inline: auto;
+}
+
+.audit-records {
+  margin-top: 1rem;
+}
+
+.audit-records .section-header {
+  display: block;
+  text-align: center;
+}
+
+.audit-records .section-header h2 {
+  margin: 0 0 0.5rem;
+}
+
+.audit-records .section-header p {
+  max-width: 680px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.audit-records .section-header button {
+  margin-top: 1rem;
+}
+
+.audit-details {
+  min-width: 150px;
+}
+
+.audit-details summary {
+  color: #2563eb;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.audit-details pre {
+  width: min(520px, 60vw);
+  max-height: 18rem;
+  overflow: auto;
+  margin: 0.75rem 0 0;
+  border: 1px solid #dde3ee;
+  border-radius: 0.6rem;
+  padding: 0.75rem;
+  background: #f8fafc;
+  color: #172033;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .account-create-form {
@@ -424,6 +483,77 @@ button:disabled {
   font-weight: 600;
 }
 
+.inventory-management {
+  margin-bottom: 1rem;
+}
+
+.inventory-management .section-header {
+  display: block;
+  text-align: center;
+}
+
+.inventory-management .section-header h2 {
+  margin: 0 0 0.5rem;
+}
+
+.inventory-management .section-header p {
+  max-width: 680px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.inventory-management .section-header button {
+  margin-top: 1rem;
+}
+
+.inventory-form {
+  border-top: 1px solid #dde3ee;
+  padding-top: 1.25rem;
+}
+
+.inventory-form-grid {
+  display: grid;
+  grid-template-columns:
+    repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.inventory-form-grid label {
+  display: grid;
+  gap: 0.4rem;
+  font-weight: 600;
+  text-align: left;
+}
+
+.inventory-form-grid input {
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.6rem;
+  padding: 0.75rem;
+  background: white;
+  color: #172033;
+  font: inherit;
+}
+
+.inventory-form-grid input:focus {
+  outline: 2px solid #2563eb;
+  outline-offset: 1px;
+}
+
+.inventory-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.table-action-button {
+  padding: 0.55rem 0.8rem;
+  background: #e2e8f0;
+  color: #172033;
+  white-space: nowrap;
+}
+
 @media (max-width: 1100px) {
   .grid {
     grid-template-columns: 1fr;
@@ -469,6 +599,14 @@ button:disabled {
 
   .account-role-control select,
   .account-actions button {
+    width: 100%;
+  }
+
+  .inventory-form-actions {
+    flex-direction: column;
+  }
+
+  .inventory-form-actions button {
     width: 100%;
   }
 }

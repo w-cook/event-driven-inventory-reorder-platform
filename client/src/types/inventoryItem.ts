@@ -10,6 +10,14 @@ export interface InventoryItem {
   updatedAt: string
 }
 
+export interface InventoryItemMutationRequest {
+  name: string
+  sku: string
+  quantityOnHand: number
+  reorderThreshold: number
+  reorderQuantity: number
+}
+
 export function isLowStock(item: InventoryItem): boolean {
   return item.quantityOnHand <= item.reorderThreshold
 }

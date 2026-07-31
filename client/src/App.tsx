@@ -4,11 +4,14 @@ import './App.css'
 import {
   clearAccessToken,
   setAccessToken,
+  setUnauthorizedHandler,
 } from './api/httpClient'
 import { listInventoryItems } from './api/inventoryItems'
 import { listReorderEvents } from './api/reorderEvents'
 import { getSystemHealth } from './api/systemHealth'
 import { AccountManagementPanel } from './components/AccountManagementPanel'
+import { AuditRecordsPanel } from './components/AuditRecordsPanel'
+import { InventoryItemForm } from './components/InventoryItemForm'
 import { InventorySummaryCards } from './components/InventorySummaryCards'
 import { InventoryTable } from './components/InventoryTable'
 import { LoginForm } from './components/LoginForm'
@@ -22,8 +25,10 @@ import type { SystemHealth } from './types/systemHealth'
 
 function App() {
   const [session, setSession] = useState<LoginResponse | null>(null)
+  const [sessionNotice, setSessionNotice] = useState('')
 
   const [items, setItems] = useState<InventoryItem[]>([])
+  const [editingItem, setEditingItem] = useState<InventoryItem | null>(null)
   const [reorderEvents, setReorderEvents] = useState<ReorderEvent[]>([])
   const [showLowStockOnly, setShowLowStockOnly] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
@@ -40,6 +45,30 @@ function App() {
 
     return items.filter(isLowStock)
   }, [items, showLowStockOnly])
+
+  useEffect(() => {
+    setUnauthorizedHandler(() => {
+      setSessionNotice(
+        'Your session expired or is no longer authorized. Please sign in again.',
+      )
+
+      setSession(null)
+      setItems([])
+      setEditingItem(null)
+      setReorderEvents([])
+      setSystemHealth(null)
+
+      setIsLoading(false)
+      setIsHealthLoading(false)
+
+      setErrorMessage('')
+      setHealthErrorMessage('')
+    })
+
+    return () => {
+      setUnauthorizedHandler(null)
+    }
+  }, [])
 
   useEffect(() => {
     if (!session) {
@@ -118,6 +147,7 @@ function App() {
     setIsHealthLoading(true)
     setHealthErrorMessage('')
 
+    setSessionNotice('')
     setSession(authenticatedSession)
   }
 
@@ -126,6 +156,7 @@ function App() {
     setSession(null)
 
     setItems([])
+    setEditingItem(null)
     setReorderEvents([])
     setSystemHealth(null)
 
@@ -155,12 +186,93 @@ function App() {
     return (
       <LoginForm
         onAuthenticated={handleAuthenticated}
+        noticeMessage={sessionNotice}
       />
     )
   }
 
   const isAdministrator =
     session.roles.includes('Administrator')
+
+  const canManageInventory =
+    session.roles.includes('Operator') ||
+    isAdministrator
+
+  async function handleInventorySaved(
+    savedItem: InventoryItem,
+    wasCreated: boolean,
+  ): Promise<void> {
+    setItems(currentItems => {
+      if (wasCreated) {
+        return [savedItem, ...currentItems]
+      }
+
+      return currentItems.map(item =>
+        item.id === savedItem.id
+          ? savedItem
+          : item,
+      )
+    })
+
+    if (!wasCreated) {
+      setEditingItem(savedItem)
+    }
+
+    setIsLoading(true)
+    setErrorMessage('')
+
+    try {
+      const [
+        loadedItems,
+        loadedReorderEvents,
+      ] = await Promise.all([
+        listInventoryItems(),
+        listReorderEvents(),
+      ])
+
+      setItems(loadedItems)
+      setReorderEvents(loadedReorderEvents)
+
+      if (!wasCreated) {
+        const refreshedItem =
+          loadedItems.find(
+            item => item.id === savedItem.id,
+          ) ?? savedItem
+
+        setEditingItem(refreshedItem)
+      }
+    } catch (error) {
+      const refreshMessage =
+        error instanceof Error
+          ? error.message
+          : 'Unable to reload dashboard data.'
+
+      throw new Error(
+        `The inventory item was saved, but the dashboard could not refresh. ${refreshMessage}`,
+        { cause: error },
+      )
+    } finally {
+      setIsLoading(false)
+    }
+
+    setIsHealthLoading(true)
+    setHealthErrorMessage('')
+
+    try {
+      const refreshedHealth =
+        await getSystemHealth()
+
+      setSystemHealth(refreshedHealth)
+    } catch (error) {
+      setHealthErrorMessage(
+        error instanceof Error
+          ? error.message
+          : 'Unable to refresh system health.',
+      )
+    } finally {
+      setIsHealthLoading(false)
+    }
+  }
 
   return (
     <main className="page">
@@ -213,7 +325,20 @@ function App() {
         </label>
       </section>
 
-      <InventoryTable items={visibleItems} />
+      <InventoryTable
+        items={visibleItems}
+        canManageInventory={canManageInventory}
+        onEdit={setEditingItem}
+      />
+
+      {canManageInventory && (
+        <InventoryItemForm
+          key={editingItem?.id ?? 'create'}
+          itemToEdit={editingItem}
+          onSaved={handleInventorySaved}
+          onCancelEdit={() => setEditingItem(null)}
+        />
+      )}
 
       <section className="grid">
         <ReorderWorkflowPanel
@@ -230,9 +355,13 @@ function App() {
       </section>
 
       {isAdministrator && (
-        <AccountManagementPanel
-          currentUserEmail={session.email}
-        />
+        <>
+          <AuditRecordsPanel />
+
+          <AccountManagementPanel
+            currentUserEmail={session.email}
+          />
+        </>
       )}
     </main>
   )

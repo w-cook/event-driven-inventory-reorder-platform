@@ -16,20 +16,16 @@ The goal is to show how a functional backend demo can evolve into a more operati
 
 ### Authenticated Operator Visibility
 
-A React/TypeScript dashboard provides:
+The React/TypeScript dashboard turns the protected backend into a usable internal operations interface. It provides:
 
-- login and logout
-- signed-in identity and role visibility
-- inventory items and low-stock conditions
-- reorder state and processing history
-- configured reorder quantities and per-event requested-quantity snapshots
-- workflow summaries
-- application and database health
-- Administrator-only application-account management
+- authenticated session and role visibility
+- inventory, low-stock, workflow, and health summaries
+- configured reorder quantities and immutable per-event request snapshots
+- Operator and Administrator inventory creation and editing
+- Administrator audit and account-management panels
+- readable validation, authorization, and invalidated-session handling
 
-The dashboard consumes protected API endpoints rather than duplicating business rules in the client. Inventory status calculation, reorder-event creation, account validation, and authorization remain backend responsibilities.
-
-The current inventory dashboard is read-only. Operator and Administrator inventory mutation forms remain planned for a later UI phase, while the corresponding protected API endpoints can be exercised through the structured `.http` workflow.
+Inventory status calculation, reorder-event creation, account validation, authorization, and audit persistence remain backend responsibilities. Viewer sessions are read-only; successful Operator or Administrator mutations reload inventory, workflow, summary, and health data from the API rather than treating optimistic client state as authoritative.
 
 ### Persistent Identity and JWT Authentication
 
@@ -57,7 +53,7 @@ The API uses policy-based authorization to enforce three operational roles:
 - `Operator` can perform the same read operations and can create or update inventory items.
 - `Administrator` can perform operational actions, inspect the audit trail, and manage application accounts.
 
-Role-aware rendering in the React client improves usability, but the API remains the security boundary. Viewer and Operator sessions do not call the Administrator-only accounts endpoint, and direct unauthorized requests are still rejected by backend policy enforcement.
+Role-aware rendering in the React client improves usability, but the API remains the security boundary. Viewer sessions do not receive inventory mutation controls, while Viewer and Operator sessions do not render or request Administrator-only audit or account-management data. Direct unauthorized requests remain rejected by backend policy enforcement.
 
 ### Reorder Configuration and Workflow Snapshots
 
@@ -76,16 +72,9 @@ This design prevents later configuration changes from silently rewriting busines
 
 ### Administrator Account Management
 
-The Administrator dashboard and API support:
+Account administration is intentionally controlled rather than exposed through public registration. Authenticated Administrators can list accounts, create password-protected users, assign or change roles, and deactivate or reactivate accounts.
 
-- listing application accounts
-- creating password-protected accounts
-- assigning Viewer, Operator, or Administrator roles
-- changing account roles
-- deactivating and reactivating accounts
-- preventing the final active Administrator from being demoted or deactivated
-
-There is no public account-registration workflow. Account creation and lifecycle changes are intentionally controlled by authenticated Administrators.
+The API prevents the final active Administrator from being demoted or deactivated. These safeguards remain enforced even when requests bypass the React interface.
 
 ### Audit Trail
 
@@ -112,6 +101,8 @@ Audit records are exposed through an Administrator-only read endpoint:
 GET /api/audit-records
 Authorization: Bearer <administrator-access-token>
 ```
+
+The Administrator frontend provides a dedicated audit-record panel with independent loading, empty, error, and refresh states. Action-specific JSON details are formatted and placed behind expandable controls so detailed change history remains available without overwhelming the table.
 
 ### Reliable Message Processing
 
@@ -174,15 +165,19 @@ The official Azure Service Bus Emulator remains available for manual producer/co
 
 ### Repeatable Manual Verification
 
-The structured API request file was updated from demo headers to real login-issued JWTs.
+The structured API request file supports a repeatable Aspire-oriented workflow that:
 
-The Aspire-oriented workflow:
-
-1. logs in as the locally configured bootstrap Administrator
+1. logs in as the configured bootstrap Administrator
 2. creates Viewer and Operator test accounts
-3. logs in as those accounts
-4. reuses named-response access tokens for role-specific requests
-5. verifies authorization, configured reorder quantities, immutable workflow snapshots, inventory changes, audit records, reorder processing, and health behavior from top to bottom
+3. reuses named-response access tokens for role-specific requests
+4. verifies authorization, reorder quantities, immutable snapshots, inventory changes, audit records, processing, and health behavior
+
+Phase 8 also included a browser-based role matrix:
+
+- Viewer sessions remained read-only
+- Operator sessions received inventory mutation controls but no audit or account-management panels
+- Administrator sessions received all privileged panels
+- role or activation changes invalidated existing sessions and returned affected users to login on their next protected request
 
 Credential values are resolved through ASP.NET Core User Secrets and are not stored in the repository.
 
@@ -204,22 +199,17 @@ These boundaries keep the implementation focused and defensible while leaving cl
 
 ## Portfolio Value
 
-This expansion demonstrates practical backend engineering concerns that transfer across stacks:
+This expansion demonstrates practical engineering concerns that transfer across business-application stacks:
 
-- ASP.NET Core Identity integration
-- signed JWT bearer authentication
-- role-based authorization
-- controlled account lifecycle management
+- ASP.NET Core Identity and signed JWT bearer authentication
+- role-based authorization and controlled account lifecycle management
 - immediate invalidation of stale authorization tokens
+- role-aware React inventory operations and Administrator audit review
 - SQL-backed auditing
-- distributed workflow reliability
-- idempotent message processing
-- duplicate-delivery protection
-- retry and dead-letter behavior
-- operational diagnostics
-- production-oriented automated testing
-- authenticated frontend visibility for backend systems
-- maintainable and accurately scoped documentation
+- distributed workflow reliability and idempotent message processing
+- duplicate-delivery protection, retry, and dead-letter behavior
+- operational diagnostics and production-oriented automated testing
 - mutable configuration versus immutable workflow-snapshot modeling
+- maintainable, accurately scoped documentation
 
 The expansion strengthens the project as evidence of practical C#/.NET backend and business-application development while keeping its limitations and claims fully defensible.

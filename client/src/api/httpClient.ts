@@ -1,11 +1,31 @@
 let accessToken: string | null = null
 
+type UnauthorizedHandler = () => void
+
+let unauthorizedHandler: UnauthorizedHandler | null = null
+
+export class ApiError extends Error {
+  readonly status: number
+
+  constructor(status: number, message: string) {
+    super(message)
+    this.name = 'ApiError'
+    this.status = status
+  }
+}
+
 export function setAccessToken(token: string | null): void {
   accessToken = token?.trim() || null
 }
 
 export function clearAccessToken(): void {
   accessToken = null
+}
+
+export function setUnauthorizedHandler(
+  handler: UnauthorizedHandler | null,
+): void {
+  unauthorizedHandler = handler
 }
 
 export async function apiFetch(
@@ -21,10 +41,17 @@ export async function apiFetch(
     )
   }
 
-  return fetch(input, {
+  const response = await fetch(input, {
     ...init,
     headers,
   })
+
+  if (response.status === 401 && accessToken) {
+    clearAccessToken()
+    unauthorizedHandler?.()
+  }
+
+  return response
 }
 
 interface ApiProblemDetails {
@@ -39,7 +66,8 @@ export async function handleJsonResponse<T>(
   const responseBody = await response.text()
 
   if (!response.ok) {
-    throw new Error(
+    throw new ApiError(
+      response.status,
       getApiErrorMessage(
         responseBody,
         response.status,
@@ -48,7 +76,8 @@ export async function handleJsonResponse<T>(
   }
 
   if (!responseBody) {
-    throw new Error(
+    throw new ApiError(
+      response.status,
       'The server returned an empty response.',
     )
   }
@@ -61,6 +90,14 @@ function getApiErrorMessage(
   status: number,
 ): string {
   if (!responseBody) {
+    if (status === 401) {
+      return 'Your session is no longer valid.'
+    }
+
+    if (status === 403) {
+      return 'You do not have permission to perform this action.'
+    }
+
     return `Request failed with status ${status}.`
   }
 
