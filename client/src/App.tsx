@@ -10,6 +10,7 @@ import { listInventoryItems } from './api/inventoryItems'
 import { listReorderEvents } from './api/reorderEvents'
 import { getSystemHealth } from './api/systemHealth'
 import { AccountManagementPanel } from './components/AccountManagementPanel'
+import { AuditRecordsPanel } from './components/AuditRecordsPanel'
 import { InventoryItemForm } from './components/InventoryItemForm'
 import { InventorySummaryCards } from './components/InventorySummaryCards'
 import { InventoryTable } from './components/InventoryTable'
@@ -354,9 +355,13 @@ function App() {
       </section>
 
       {isAdministrator && (
-        <AccountManagementPanel
-          currentUserEmail={session.email}
-        />
+        <>
+          <AuditRecordsPanel />
+
+          <AccountManagementPanel
+            currentUserEmail={session.email}
+          />
+        </>
       )}
     </main>
   )

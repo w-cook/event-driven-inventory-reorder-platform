@@ -344,6 +344,55 @@ button:disabled {
   margin-inline: auto;
 }
 
+.audit-records {
+  margin-top: 1rem;
+}
+
+.audit-records .section-header {
+  display: block;
+  text-align: center;
+}
+
+.audit-records .section-header h2 {
+  margin: 0 0 0.5rem;
+}
+
+.audit-records .section-header p {
+  max-width: 680px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.audit-records .section-header button {
+  margin-top: 1rem;
+}
+
+.audit-details {
+  min-width: 150px;
+}
+
+.audit-details summary {
+  color: #2563eb;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.audit-details pre {
+  width: min(520px, 60vw);
+  max-height: 18rem;
+  overflow: auto;
+  margin: 0.75rem 0 0;
+  border: 1px solid #dde3ee;
+  border-radius: 0.6rem;
+  padding: 0.75rem;
+  background: #f8fafc;
+  color: #172033;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .account-create-form {
   border-top: 1px solid #dde3ee;
   border-bottom: 1px solid #dde3ee;
