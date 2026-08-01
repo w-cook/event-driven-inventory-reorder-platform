@@ -16,37 +16,37 @@ The React client authenticates application-managed users through the protected l
 
 ![Inventory Operations Dashboard overview](docs/images/operations-dashboard-overview.png)
 
-The authenticated React/TypeScript dashboard combines inventory and workflow summaries, current stock conditions, configured reorder quantities, low-stock filtering, and signed-in user context in one operator-facing view.
+The authenticated Dashboard presents inventory and workflow summary metrics beside a compact System Health card, while the persistent header keeps the signed-in user and assigned roles visible.
 
 ### Reorder Quantity Workflow
 
 ![Inventory and reorder workflow quantity comparison](docs/images/reorder-workflow-quantities.png)
 
-Inventory items retain a configurable reorder quantity for future workflows, while each reorder event stores an independent requested-quantity snapshot. Later configuration changes do not rewrite an existing request. The adjacent System Health card shows API and database status, operational record counts, and the latest check time used during workflow verification.
+The dedicated Workflow view compares quantity at trigger with the immutable requested quantity stored for each reorder event. Later inventory-configuration changes do not rewrite an existing request.
 
 ### Low-Stock Review
 
 ![Inventory dashboard filtered to low-stock items](docs/images/inventory-low-stock-filter.png)
 
-The low-stock filter narrows the inventory table to items requiring attention while retaining their current quantity, reorder threshold, configured reorder quantity, and workflow context.
+The Inventory view can be narrowed to items requiring attention while retaining current quantity, reorder threshold, configured reorder quantity, status, and available management actions.
 
 ### Privileged Inventory Management
 
 ![Operator and Administrator inventory management interface](docs/images/inventory-management.png)
 
-Authenticated Operators and Administrators can create inventory items and edit current stock, reorder thresholds, and configured reorder quantities. Successful mutations refresh inventory summaries, workflow history, and system health from authoritative backend state.
+The Inventory view gives Operators and Administrators compact create and edit controls alongside the current inventory table. Successful mutations reload inventory, workflow, and health data from authoritative backend state.
 
 ### Administrator Audit Review
 
 ![Administrator audit-record review interface](docs/images/audit-records.png)
 
-Authenticated Administrators can review successful inventory and account-management actions, including the acting user and role, affected entity, occurrence time, and formatted action-specific details.
+The Administrator-only Audit view presents successful inventory and account-management actions with actor, role, affected entity, occurrence time, and expandable action-specific details.
 
 ### Administrator Account Management
 
 ![Administrator account management interface](docs/images/account-management.png)
 
-Authenticated Administrators can create application accounts, review assigned roles and activation status, change roles, and deactivate or reactivate accounts through the role-aware frontend.
+The Administrator-only Administration view supports account creation, role review and changes, and account deactivation or reactivation without exposing public registration.
 
 ### Correlated Workflow Diagnostics
 
@@ -93,6 +93,7 @@ A processed reorder request remains distinct from receiving replacement stock. S
 - signed JWT access tokens and policy-based role authorization
 - Administrator-controlled account and role management
 - role-aware React/TypeScript inventory operations
+- responsive five-view frontend information architecture with compact, readable presentation
 - Administrator-facing audit-trail review
 - readable client handling for validation, forbidden, and invalidated-session responses
 - background processing with a .NET Worker Service
@@ -110,24 +111,21 @@ A processed reorder request remains distinct from receiving replacement stock. S
 
 ## Key Engineering Areas
 
-### Operations Dashboard
+### Role-Aware Operations Client
 
-The React/TypeScript client provides:
+The React/TypeScript client organizes authenticated work into five focused views:
 
-- authenticated login and logout with in-memory JWT handling
-- signed-in user and role visibility
-- inventory and workflow summary metrics
-- current stock, threshold, configured reorder quantity, and low-stock visibility
-- Operator and Administrator inventory-item creation and editing
-- reorder-event history with quantity-at-trigger and requested-quantity snapshots
-- automatic inventory, workflow, summary, and health refresh after mutations
-- application and database health information
-- Administrator-only audit review with expandable details
-- Administrator account creation, role changes, and activation controls
-- independent loading, empty, success, and error states
-- automatic logout and a clear notice when a token is invalidated or rejected
+- **Dashboard:** inventory and workflow summaries with application and database health
+- **Inventory:** current stock, low-stock filtering, and Operator or Administrator create/edit controls
+- **Workflow:** reorder-event history with quantity-at-trigger and requested-quantity snapshots
+- **Audit:** Administrator-only review of successful inventory and account-management actions
+- **Administration:** Administrator-only account creation, role management, and activation controls
+
+A persistent application header shows the signed-in account and roles, while semantic navigation identifies the active view. The layout is intentionally dense on wide screens and stacks cleanly at narrower widths; wide tables remain contained within their cards and can scroll horizontally when necessary.
 
 Viewer sessions remain read-only. Operator sessions receive inventory-management controls but do not render or request Administrator-only audit or account-management data. The API independently enforces every authorization boundary and all inventory/workflow business rules.
+
+The client maintains independent loading, empty, success, and error states for the data it presents. Successful mutations reload authoritative backend state rather than relying on speculative client updates.
 
 Access tokens are retained only in frontend memory. Refreshing or closing the page clears the session and requires another login; refresh-token infrastructure and persistent browser sessions remain outside the project scope.
 
@@ -230,7 +228,7 @@ See [System Architecture](docs/architecture.md) for the component diagram, runti
 | `InventoryReorderPlatform.Contracts` | Contains messaging contracts and shared configuration models |
 | `InventoryReorderPlatform.Api.Tests` | Contains authentication, authorization, account-management, auditing, middleware, and API workflow integration tests |
 | `InventoryReorderPlatform.Processor.Tests` | Contains processor reliability tests |
-| `client` | Contains the authenticated React/TypeScript operations dashboard |
+| `client` | Contains the authenticated, role-aware React/TypeScript operations client and its five application views |
 
 ## Core Workflow
 
@@ -322,12 +320,6 @@ From the repository root:
 docker compose -f docker-compose.local.yml up -d sb-emulator-sql servicebus-emulator
 ```
 
-On Windows Command Prompt, use:
-
-```cmd
-docker compose -f docker-compose.local.yml up -d sb-emulator-sql servicebus-emulator
-```
-
 Confirm that the containers are running:
 
 ```bash
@@ -371,12 +363,6 @@ When using the fixed identifiers and expected counts in that file:
 Stop the AppHost with `Ctrl+C`, then stop the emulator containers:
 
 ```bash
-docker compose -f docker-compose.local.yml stop servicebus-emulator sb-emulator-sql
-```
-
-On Windows Command Prompt, use:
-
-```cmd
 docker compose -f docker-compose.local.yml stop servicebus-emulator sb-emulator-sql
 ```
 
@@ -583,7 +569,7 @@ Each document has a focused purpose:
 - [Observability runbook](docs/observability-runbook.md) — operational steps for tracing and diagnosing a workflow
 - [Frontend README](client/README.md) — client-specific startup, proxy configuration, environment settings, and scripts
 
-Phases 1–8 are complete: the project now includes the operations dashboard, Identity/JWT authentication, authorization and auditing, reliable message processing, observability, production-oriented testing, reorder-quantity configuration, and privileged operations UI. Frontend information-architecture polish and final API documentation remain tracked in the roadmap.
+Phases 1–9 are complete: the project now includes the operations client, Identity/JWT authentication, authorization and auditing, reliable message processing, observability, production-oriented testing, reorder-quantity configuration, privileged operations, and responsive frontend information architecture. Complete endpoint-by-endpoint API documentation and final verification remain tracked in Phase 10.
 
 ## Scope and Limitations
 
@@ -598,6 +584,7 @@ Phases 1–8 are complete: the project now includes the operations dashboard, Id
 - signed JWT access tokens and role-based authorization
 - Administrator-controlled account and role management
 - role-aware API and frontend inventory operations
+- responsive Dashboard, Inventory, Workflow, Audit, and Administration views
 - Administrator audit and account-management interfaces
 - local health, logs, metrics, and traces
 - configurable reorder quantities and immutable per-event requested-quantity snapshots
@@ -622,7 +609,7 @@ Phases 1–8 are complete: the project now includes the operations dashboard, Id
 
 This project is positioned primarily as evidence of practical C#/.NET backend and distributed-system work: authenticated ASP.NET Core APIs, SQL-backed business state, reliable queue processing, auditing, diagnostics, and automated integration tests.
 
-The React client demonstrates that those backend capabilities are usable through a role-aware internal business interface rather than existing only as isolated endpoints. Claims remain deliberately conservative, and the full system can be reproduced locally without paid cloud services.
+The React client demonstrates that those backend capabilities are usable through a compact, responsive, role-aware internal business interface rather than existing only as isolated endpoints. Claims remain deliberately conservative, and the full system can be reproduced locally without paid cloud services.
 
 ## License
 

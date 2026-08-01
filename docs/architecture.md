@@ -11,7 +11,7 @@ flowchart LR
     User["Viewer / Operator / Administrator"]
 
     subgraph Client["Operations Client"]
-        React["React + TypeScript Dashboard"]
+        React["React + TypeScript Operations Client"]
     end
 
     subgraph Application["Application Services"]
@@ -66,27 +66,23 @@ flowchart LR
 
 ## Component Responsibilities
 
-### React Operations Dashboard
+### React Operations Client
 
-The React and TypeScript client provides:
+The React and TypeScript client provides an authenticated shell with persistent session context, semantic view navigation, and five focused application views:
 
-- authenticated login and logout
-- in-memory JWT access-token handling
-- signed-in user and role visibility
-- current stock, reorder thresholds, configured reorder quantities, and backend-derived status
-- low-stock filtering
-- Operator and Administrator inventory-item creation and editing
-- reorder-processing history with quantity-at-trigger and requested-quantity snapshots
-- application and database health
-- Administrator-only audit-record review
-- Administrator-only account listing, creation, role changes, deactivation, and reactivation
-- readable validation, authorization, and invalidated-session handling
+- Dashboard for inventory and workflow summaries plus system health
+- Inventory for stock review, low-stock filtering, and privileged create/edit operations
+- Workflow for reorder-event history and quantity snapshots
+- Audit for Administrator-only audit review
+- Administration for Administrator-only account lifecycle management
 
-Viewer sessions use the dashboard as a read-only operational view. Operator and Administrator sessions can create and edit inventory items through protected API endpoints. Only Administrators render or request audit and account-management data, reducing unnecessary privileged requests without treating the client as the security boundary.
+The active view is client presentation state rather than an authorization boundary. Viewer, Operator, and Administrator capabilities remain enforced by API policies even when unavailable controls or views are omitted from the interface.
 
-After a successful inventory mutation, the client reloads inventory and reorder-event state and refreshes system health so the interface reflects authoritative backend results.
+The client keeps the JWT access token in application memory and attaches it to protected requests. A rejected or invalidated token clears authenticated client state and returns the user to the login form.
 
-The client does not duplicate backend inventory, workflow, authentication, or authorization rules. Access tokens are stored only in application memory, so refreshing or closing the page ends the current frontend session. A rejected or invalidated token clears the authenticated client state and returns the user to the login form.
+Inventory and workflow business state remains backend-owned. After successful inventory mutations, the client reloads inventory, reorder-event, and health data so summaries and tables reflect authoritative results.
+
+The presentation layer uses compact cards, consistent view headers, contained wide tables, visible focus treatment, and responsive stacking. These choices affect information delivery only; they do not duplicate inventory, workflow, authentication, or authorization rules.
 
 ### ASP.NET Core API
 
@@ -182,7 +178,7 @@ Authentication and authorization failures remain normal HTTP request outcomes. S
 
 The same application architecture supports two local development paths:
 
-- **.NET Aspire:** orchestrates the API, Processor, React client, SQL Server, health information, logs, metrics, and traces.
+- **.NET Aspire:** orchestrates the API, Processor, React operations client, SQL Server, health information, logs, metrics, and traces.
 - **Docker/local mode:** runs the backend and infrastructure through Docker Compose while the React client is started separately.
 
 Both modes use zero-cost local infrastructure and the same Identity, authorization, inventory, and messaging workflow.

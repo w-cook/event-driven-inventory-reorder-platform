@@ -2,25 +2,24 @@
 
 React/TypeScript frontend for the Event-Driven Inventory Reorder Platform.
 
-The client provides an authenticated operations dashboard for inventory visibility, low-stock review, configured reorder quantities, inventory creation and updates, reorder-request snapshots, processing history, application health, Administrator audit review, and Administrator account management. Inventory and workflow business rules remain in the ASP.NET Core API.
+The client provides an authenticated, role-aware operations interface organized into Dashboard, Inventory, Workflow, Audit, and Administration views. Inventory and workflow business rules remain in the ASP.NET Core API.
 
 ## Features
 
 - application login and logout with in-memory JWT bearer authentication
-- signed-in user and role visibility
-- inventory and workflow summary metrics
-- inventory table with stock, thresholds, configured reorder quantities, and backend-derived status
-- low-stock filtering
+- persistent signed-in user and role visibility
+- semantic navigation with active-view indication and keyboard-accessible native controls
+- Dashboard view with inventory and workflow summary metrics beside system health
+- Inventory view with current stock, thresholds, configured reorder quantities, low-stock filtering, and backend-derived status
 - Operator and Administrator inventory creation and editing
-- readable mutation validation and API errors
-- automatic inventory, workflow, summary, and health refresh after mutations
-- reorder-event history with quantity-at-trigger and requested-quantity snapshots
-- application and database health with manual refresh
-- Administrator-only audit review with formatted, expandable details
-- Administrator account creation, role changes, and activation controls
+- Workflow view with quantity-at-trigger and requested-quantity snapshots
+- Administrator-only Audit view with formatted, expandable details
+- Administrator-only Administration view with account creation, role changes, and activation controls
 - independent loading, empty, success, and error states
+- compact wide-screen presentation with responsive stacking and contained wide tables
+- automatic inventory, workflow, summary, and health refresh after successful mutations
 
-The API remains the authoritative security and business-rule boundary. Frontend role checks improve usability by hiding unavailable actions, while protected endpoints independently enforce the same authorization requirements.
+The API remains the authoritative security and business-rule boundary. Frontend role checks improve usability by hiding unavailable views and actions, while protected endpoints independently enforce the same authorization requirements.
 
 ## Authentication Model
 
@@ -77,6 +76,30 @@ Role or activation changes invalidate previously issued tokens for the affected 
 
 When an authenticated API request returns `401 Unauthorized`, the client clears its in-memory access token and authenticated state, returns to the login form, and explains that the session is no longer valid. Standard `403 Forbidden` responses are converted into a readable permission message.
 
+## View Structure and Responsive Behavior
+
+The authenticated application uses one persistent shell rather than separate browser routes.
+
+| View | Purpose | Availability |
+| --- | --- | --- |
+| `Dashboard` | Inventory and workflow summary metrics plus System Health | Viewer, Operator, Administrator |
+| `Inventory` | Stock review, low-stock filtering, and inventory create/edit controls | Read for all roles; mutations for Operator and Administrator |
+| `Workflow` | Reorder-event and requested-quantity history | Viewer, Operator, Administrator |
+| `Audit` | Successful inventory and account-management actions | Administrator |
+| `Administration` | Account creation, role management, and activation controls | Administrator |
+
+On wide screens, the Dashboard places System Health beside the summary-card groups to reduce unnecessary vertical space. Page headers and card spacing use a compact hierarchy suitable for an internal operations tool.
+
+At narrower widths:
+
+- the application header and navigation stack and center
+- Dashboard sections return to a single column
+- forms collapse to practical single-column layouts
+- wide tables remain contained within their cards and can scroll horizontally
+- navigation buttons remain keyboard operable and fill the available width
+
+The active view is held in client state and is not currently encoded in the browser URL.
+
 ## Backend Dependency
 
 The client calls protected `/api` endpoints exposed by `InventoryReorderPlatform.Api`.
@@ -114,12 +137,6 @@ Aspire is the preferred development mode because it starts the client with the A
 From the repository root, first start the external Service Bus Emulator dependencies:
 
 ```bash
-docker compose -f docker-compose.local.yml up -d sb-emulator-sql servicebus-emulator
-```
-
-On Windows Command Prompt:
-
-```cmd
 docker compose -f docker-compose.local.yml up -d sb-emulator-sql servicebus-emulator
 ```
 
@@ -242,10 +259,10 @@ npm run preview
 ```text
 src/
 ├── api/          Authenticated HTTP client and endpoint request functions
-├── components/   Login, inventory, workflow, health, audit, and administration UI
-├── types/        Authentication, account, inventory, audit, and workflow API types
-├── App.tsx       Session state, role-aware composition, loading, and refresh coordination
-└── App.css       Layout, forms, tables, badges, and responsive presentation
+├── components/   Login, navigation, inventory, workflow, health, audit, and administration UI
+├── types/        Authentication, active-view, account, inventory, audit, and workflow types
+├── App.tsx       Session state, active-view composition, loading, and refresh coordination
+└── App.css       Organized application-shell, view, card, form, table, and responsive styles
 ```
 
 Important client responsibilities include:
@@ -255,24 +272,26 @@ Important client responsibilities include:
 - `src/api/accounts.ts` performs Administrator account-management requests
 - `src/api/inventoryItems.ts` performs protected inventory listing, creation, and update requests
 - `src/api/auditRecords.ts` retrieves Administrator-only audit records
+- `src/components/AppNavigation.tsx` renders the role-aware application navigation and active-view state
 - `src/components/LoginForm.tsx` handles unauthenticated login state
 - `src/components/InventoryItemForm.tsx` handles inventory creation and editing
 - `src/components/AuditRecordsPanel.tsx` displays successful inventory and account-management actions
 - `src/components/AccountManagementPanel.tsx` lists accounts and exposes role and activation controls
 - `src/components/CreateAccountForm.tsx` handles Administrator account creation
-- `src/App.tsx` coordinates authenticated state, logout, invalidated-session handling, role-aware rendering, dashboard loading, and data refresh after inventory mutations
+- `src/types/appView.ts` defines the available application views
+- `src/App.tsx` coordinates authenticated state, logout, invalidated-session handling, role-aware view composition, loading, and data refresh
 
 ## Data Loading
 
-After authentication, the dashboard loads inventory items and reorder events together. The system-health panel maintains its own loading and error state so it can fail or refresh independently without hiding inventory and workflow data.
+After authentication, the client loads inventory items and reorder events, then presents the relevant subset through the active view. System Health maintains its own loading and error state so it can fail or refresh independently without hiding summary or workflow information.
 
-After a successful inventory creation or update, the client reloads inventory items and reorder events so summaries, low-stock visibility, workflow history, and the edited item reflect authoritative backend state. It also refreshes system health independently.
+After a successful inventory creation or update, the client reloads inventory items and reorder events so Dashboard metrics, low-stock visibility, Workflow history, and the edited item reflect authoritative backend state. It also refreshes System Health independently.
 
 Inventory status remains calculated by the backend. The low-stock filter operates on inventory data already returned by the API.
 
-The Administrator audit panel and account-management panel load only for an authenticated Administrator. Viewer and Operator sessions do not render those panels or call their protected endpoints.
+Audit and account data load only for an authenticated Administrator. Viewer and Operator sessions do not render those views or call their protected endpoints.
 
-After account creation, role changes, or activation changes, the account-management view updates its displayed data and reports the result to the Administrator. Audit records can then be reloaded through the audit panel’s refresh control.
+After account creation, role changes, or activation changes, the Administration view updates its displayed data and reports the result. Audit records can then be reloaded through the Audit view’s refresh control.
 
 ## Error Handling
 
@@ -297,12 +316,12 @@ The API remains responsible for enforcing all security and business constraints 
 The client intentionally does not provide:
 
 - persistent browser sessions or refresh tokens
+- URL-addressable or deep-linkable application views
 - dead-letter replay controls
 - supplier or purchasing workflows
 - automatic stock receipt
+- password reset, password change, or email-verification workflows
 - production enterprise identity-provider integration
-- separate routed dashboard, inventory, workflow, audit, and administration views
-
-Separate application views and broader layout, responsive, accessibility, and interaction polish are planned for the frontend information-architecture phase.
 
 For complete architecture, backend behavior, local infrastructure, screenshots, testing, and documentation links, see the repository-level [README](../README.md).
+
