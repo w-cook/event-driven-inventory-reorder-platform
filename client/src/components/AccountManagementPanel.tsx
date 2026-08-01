@@ -237,11 +237,11 @@ export function AccountManagementPanel({
     <section className="card account-management">
       <div className="section-header">
         <div>
-          <h2>Account Management</h2>
+          <h3>Accounts and Access</h3>
 
           <p>
-            Create and review application accounts,
-            assigned roles, and access status.
+            Review existing accounts, assigned roles,
+            and access status.
           </p>
         </div>
       </div>

@@ -78,12 +78,7 @@ export function AuditRecordsPanel() {
     <section className="card audit-records">
       <div className="section-header">
         <div>
-          <h2>Audit Records</h2>
-
-          <p>
-            Review successful inventory and
-            account-administration actions.
-          </p>
+          <h3>Recorded Actions</h3>
         </div>
 
         <button

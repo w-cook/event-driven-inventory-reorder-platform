@@ -101,11 +101,11 @@ export function InventoryItemForm({
     <section className="card inventory-management">
       <div className="section-header">
         <div>
-          <h2>
+          <h3>
             {isEditing
               ? 'Edit Inventory Item'
               : 'Create Inventory Item'}
-          </h2>
+          </h3>
 
           <p>
             {isEditing

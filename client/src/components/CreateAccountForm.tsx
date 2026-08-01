@@ -109,7 +109,7 @@ export function CreateAccountForm({
         </label>
 
         <label className="account-password-field">
-          Temporary password
+          Password
           <input
             type="password"
             value={password}

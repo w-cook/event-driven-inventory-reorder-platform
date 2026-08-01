@@ -289,17 +289,35 @@ function App() {
   return (
     <main className="page">
       <header className="hero">
+        <div className="app-branding">
+          <h1>Inventory Operations</h1>
+
+          <p>
+            Role-aware inventory and workflow platform.
+          </p>
+        </div>
+
         <div className="session-bar">
-          <div>
-            <p className="eyebrow">
+          <div className="session-identity">
+            <p className="session-label">
               Signed in as
             </p>
 
             <strong>{session.email}</strong>
 
-            <p className="session-roles">
-              {session.roles.join(', ')}
-            </p>
+            <div
+              className="session-roles"
+              aria-label="Assigned roles"
+            >
+              {session.roles.map(role => (
+                <span
+                  key={role}
+                  className="badge neutral"
+                >
+                  {role}
+                </span>
+              ))}
+            </div>
           </div>
 
           <button
@@ -310,13 +328,6 @@ function App() {
             Sign out
           </button>
         </div>
-
-        <h1>Inventory Operations Dashboard</h1>
-        
-        <p>
-          Role-aware operations interface for inventory management, reorder workflow
-          monitoring, system health, audit review, and account administration.
-        </p>
       </header>
 
       <AppNavigation
@@ -344,42 +355,46 @@ function App() {
             </p>
           </header>
 
-          <InventorySummaryCards items={items} />
+          <div className="dashboard-content-grid">
+            <div className="dashboard-summary-column">
+              <InventorySummaryCards items={items} />
 
-          <WorkflowSummaryCards
-            events={reorderEvents}
-          />
+              <WorkflowSummaryCards
+                events={reorderEvents}
+              />
+            </div>
 
-          <SystemHealthPanel
-            health={systemHealth}
-            isLoading={isHealthLoading}
-            errorMessage={healthErrorMessage}
-            onRefresh={handleHealthRefresh}
-          />
+            <SystemHealthPanel
+              health={systemHealth}
+              isLoading={isHealthLoading}
+              errorMessage={healthErrorMessage}
+              onRefresh={handleHealthRefresh}
+            />
+          </div>
         </section>
       )}
 
       {activeView === 'inventory' && (
-        <div className="app-view">
-          <section className="toolbar">
-            <label>
-              <input
-                type="checkbox"
-                checked={showLowStockOnly}
-                onChange={event =>
-                  setShowLowStockOnly(
-                    event.target.checked,
-                  )
-                }
-              />
+        <section
+          className="app-view"
+          aria-labelledby="inventory-view-title"
+        >
+          <header className="view-header">
+            <h2 id="inventory-view-title">
+              Inventory
+            </h2>
 
-              Show low-stock items only
-            </label>
-          </section>
+            <p>
+              Review current stock levels and maintain
+              inventory and reorder configuration.
+            </p>
+          </header>
 
           <InventoryTable
             items={visibleItems}
             canManageInventory={canManageInventory}
+            showLowStockOnly={showLowStockOnly}
+            onShowLowStockOnlyChange={setShowLowStockOnly}
             onEdit={setEditingItem}
           />
 
@@ -393,11 +408,25 @@ function App() {
               }
             />
           )}
-        </div>
+        </section>
       )}
 
       {activeView === 'workflow' && (
-        <div className="app-view">
+        <section
+          className="app-view"
+          aria-labelledby="workflow-view-title"
+        >
+          <header className="view-header">
+            <h2 id="workflow-view-title">
+              Reorder Workflow
+            </h2>
+
+            <p>
+              Monitor reorder requests as they move
+              through background processing.
+            </p>
+          </header>
+
           <WorkflowSummaryCards
             events={reorderEvents}
           />
@@ -406,23 +435,51 @@ function App() {
             events={reorderEvents}
             inventoryItems={items}
           />
-        </div>
+        </section>
       )}
 
       {activeView === 'audit' &&
         isAdministrator && (
-          <div className="app-view">
+          <section
+            className="app-view"
+            aria-labelledby="audit-view-title"
+          >
+            <header className="view-header">
+              <h2 id="audit-view-title">
+                Audit Records
+              </h2>
+
+              <p>
+                Review successful inventory and
+                account-administration actions.
+              </p>
+            </header>
+
             <AuditRecordsPanel />
-          </div>
+          </section>
         )}
 
       {activeView === 'administration' &&
         isAdministrator && (
-          <div className="app-view">
+          <section
+            className="app-view"
+            aria-labelledby="administration-view-title"
+          >
+            <header className="view-header">
+              <h2 id="administration-view-title">
+                Administration
+              </h2>
+
+              <p>
+                Create accounts and manage application
+                roles and access.
+              </p>
+            </header>
+
             <AccountManagementPanel
               currentUserEmail={session.email}
             />
-          </div>
+          </section>
         )}
     </main>
   )

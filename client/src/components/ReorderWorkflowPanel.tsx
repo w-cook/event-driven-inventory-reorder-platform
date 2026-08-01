@@ -43,7 +43,7 @@ export function ReorderWorkflowPanel({
   if (events.length === 0) {
     return (
       <section className="card">
-        <h2>Reorder Workflow</h2>
+        <h2>Workflow History</h2>
         <p>No reorder workflow events found.</p>
       </section>
     )
@@ -51,7 +51,7 @@ export function ReorderWorkflowPanel({
 
   return (
     <section className="card">
-      <h2>Reorder Workflow</h2>
+      <h2>Workflow History</h2>
 
       <p className="muted">
         Requested quantity is captured when the reorder workflow begins. A processed
