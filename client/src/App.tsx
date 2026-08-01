@@ -10,6 +10,7 @@ import { listInventoryItems } from './api/inventoryItems'
 import { listReorderEvents } from './api/reorderEvents'
 import { getSystemHealth } from './api/systemHealth'
 import { AccountManagementPanel } from './components/AccountManagementPanel'
+import { AppNavigation } from './components/AppNavigation'
 import { AuditRecordsPanel } from './components/AuditRecordsPanel'
 import { InventoryItemForm } from './components/InventoryItemForm'
 import { InventorySummaryCards } from './components/InventorySummaryCards'
@@ -19,6 +20,7 @@ import { ReorderWorkflowPanel } from './components/ReorderWorkflowPanel'
 import { SystemHealthPanel } from './components/SystemHealthPanel'
 import { WorkflowSummaryCards } from './components/WorkflowSummaryCards'
 import { isLowStock, type InventoryItem } from './types/inventoryItem'
+import type { AppView } from './types/appView'
 import type { LoginResponse } from './types/auth'
 import type { ReorderEvent } from './types/reorderEvent'
 import type { SystemHealth } from './types/systemHealth'
@@ -26,6 +28,7 @@ import type { SystemHealth } from './types/systemHealth'
 function App() {
   const [session, setSession] = useState<LoginResponse | null>(null)
   const [sessionNotice, setSessionNotice] = useState('')
+  const [activeView, setActiveView] = useState<AppView>('dashboard')
 
   const [items, setItems] = useState<InventoryItem[]>([])
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null)
@@ -53,6 +56,7 @@ function App() {
       )
 
       setSession(null)
+      setActiveView('dashboard')
       setItems([])
       setEditingItem(null)
       setReorderEvents([])
@@ -147,6 +151,8 @@ function App() {
     setIsHealthLoading(true)
     setHealthErrorMessage('')
 
+    setActiveView('dashboard')
+
     setSessionNotice('')
     setSession(authenticatedSession)
   }
@@ -154,6 +160,8 @@ function App() {
   function handleLogout() {
     clearAccessToken()
     setSession(null)
+
+    setActiveView('dashboard')
 
     setItems([])
     setEditingItem(null)
@@ -274,20 +282,42 @@ function App() {
     }
   }
 
+  function handleNavigate(view: AppView) {
+    setActiveView(view)
+  }
+
   return (
     <main className="page">
       <header className="hero">
+        <div className="app-branding">
+          <h1>Inventory Operations</h1>
+
+          <p>
+            Role-aware inventory and workflow platform.
+          </p>
+        </div>
+
         <div className="session-bar">
-          <div>
-            <p className="eyebrow">
+          <div className="session-identity">
+            <p className="session-label">
               Signed in as
             </p>
 
             <strong>{session.email}</strong>
 
-            <p className="session-roles">
-              {session.roles.join(', ')}
-            </p>
+            <div
+              className="session-roles"
+              aria-label="Assigned roles"
+            >
+              {session.roles.map(role => (
+                <span
+                  key={role}
+                  className="badge neutral"
+                >
+                  {role}
+                </span>
+              ))}
+            </div>
           </div>
 
           <button
@@ -298,71 +328,159 @@ function App() {
             Sign out
           </button>
         </div>
-
-        <h1>Inventory Operations Dashboard</h1>
-        
-        <p>
-          Operator-facing dashboard for inventory visibility, low-stock review,
-          reorder workflow status, processing history, and system health.
-        </p>
       </header>
+
+      <AppNavigation
+        activeView={activeView}
+        isAdministrator={isAdministrator}
+        onNavigate={handleNavigate}
+      />
 
       {errorMessage && <p className="error">{errorMessage}</p>}
       {isLoading && <p>Loading dashboard...</p>}
 
-      <InventorySummaryCards items={items} />
+      {activeView === 'dashboard' && (
+        <section
+          className="app-view"
+          aria-labelledby="dashboard-view-title"
+        >
+          <header className="view-header">
+            <h2 id="dashboard-view-title">
+              Operations Overview
+            </h2>
 
-      <WorkflowSummaryCards events={reorderEvents} />
+            <p>
+              Review inventory conditions, reorder
+              activity, and application health.
+            </p>
+          </header>
 
-      <section className="toolbar">
-        <label>
-          <input
-            type="checkbox"
-            checked={showLowStockOnly}
-            onChange={(event) => setShowLowStockOnly(event.target.checked)}
-          />
-          Show low-stock items only
-        </label>
-      </section>
+          <div className="dashboard-content-grid">
+            <div className="dashboard-summary-column">
+              <InventorySummaryCards items={items} />
 
-      <InventoryTable
-        items={visibleItems}
-        canManageInventory={canManageInventory}
-        onEdit={setEditingItem}
-      />
+              <WorkflowSummaryCards
+                events={reorderEvents}
+              />
+            </div>
 
-      {canManageInventory && (
-        <InventoryItemForm
-          key={editingItem?.id ?? 'create'}
-          itemToEdit={editingItem}
-          onSaved={handleInventorySaved}
-          onCancelEdit={() => setEditingItem(null)}
-        />
+            <SystemHealthPanel
+              health={systemHealth}
+              isLoading={isHealthLoading}
+              errorMessage={healthErrorMessage}
+              onRefresh={handleHealthRefresh}
+            />
+          </div>
+        </section>
       )}
 
-      <section className="grid">
-        <ReorderWorkflowPanel
-          events={reorderEvents}
-          inventoryItems={items}
-        />
+      {activeView === 'inventory' && (
+        <section
+          className="app-view"
+          aria-labelledby="inventory-view-title"
+        >
+          <header className="view-header">
+            <h2 id="inventory-view-title">
+              Inventory
+            </h2>
 
-        <SystemHealthPanel
-          health={systemHealth}
-          isLoading={isHealthLoading}
-          errorMessage={healthErrorMessage}
-          onRefresh={handleHealthRefresh}
-        />
-      </section>
+            <p>
+              Review current stock levels and maintain
+              inventory and reorder configuration.
+            </p>
+          </header>
 
-      {isAdministrator && (
-        <>
-          <AuditRecordsPanel />
-
-          <AccountManagementPanel
-            currentUserEmail={session.email}
+          <InventoryTable
+            items={visibleItems}
+            canManageInventory={canManageInventory}
+            showLowStockOnly={showLowStockOnly}
+            onShowLowStockOnlyChange={setShowLowStockOnly}
+            onEdit={setEditingItem}
           />
-        </>
+
+          {canManageInventory && (
+            <InventoryItemForm
+              key={editingItem?.id ?? 'create'}
+              itemToEdit={editingItem}
+              onSaved={handleInventorySaved}
+              onCancelEdit={() =>
+                setEditingItem(null)
+              }
+            />
+          )}
+        </section>
       )}
+
+      {activeView === 'workflow' && (
+        <section
+          className="app-view"
+          aria-labelledby="workflow-view-title"
+        >
+          <header className="view-header">
+            <h2 id="workflow-view-title">
+              Reorder Workflow
+            </h2>
+
+            <p>
+              Monitor reorder requests as they move
+              through background processing.
+            </p>
+          </header>
+
+          <WorkflowSummaryCards
+            events={reorderEvents}
+          />
+
+          <ReorderWorkflowPanel
+            events={reorderEvents}
+            inventoryItems={items}
+          />
+        </section>
+      )}
+
+      {activeView === 'audit' &&
+        isAdministrator && (
+          <section
+            className="app-view"
+            aria-labelledby="audit-view-title"
+          >
+            <header className="view-header">
+              <h2 id="audit-view-title">
+                Audit Records
+              </h2>
+
+              <p>
+                Review successful inventory and
+                account-administration actions.
+              </p>
+            </header>
+
+            <AuditRecordsPanel />
+          </section>
+        )}
+
+      {activeView === 'administration' &&
+        isAdministrator && (
+          <section
+            className="app-view"
+            aria-labelledby="administration-view-title"
+          >
+            <header className="view-header">
+              <h2 id="administration-view-title">
+                Administration
+              </h2>
+
+              <p>
+                Create accounts and manage application
+                roles and access.
+              </p>
+            </header>
+
+            <AccountManagementPanel
+              currentUserEmail={session.email}
+            />
+          </section>
+        )}
     </main>
   )
 }

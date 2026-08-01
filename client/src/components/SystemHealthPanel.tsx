@@ -41,10 +41,11 @@ export function SystemHealthPanel({
   return (
     <section className="card system-health-panel">
       <div className="section-header">
-        <h2>System Health</h2>
+        <h3>System Health</h3>
 
         <button
           type="button"
+          className="secondary-button"
           onClick={onRefresh}
           disabled={isLoading}
         >

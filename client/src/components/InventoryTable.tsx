@@ -3,26 +3,57 @@ import { isLowStock, type InventoryItem } from '../types/inventoryItem'
 interface Props {
   items: InventoryItem[]
   canManageInventory: boolean
+  showLowStockOnly: boolean
+  onShowLowStockOnlyChange: (
+    showLowStockOnly: boolean,
+  ) => void
   onEdit: (item: InventoryItem) => void
 }
 
 export function InventoryTable({
   items,
   canManageInventory,
+  showLowStockOnly,
+  onShowLowStockOnlyChange,
   onEdit,
 }: Props) {
+  const header = (
+    <div className="section-header inventory-table-header">
+      <h3>Inventory Items</h3>
+
+      <label className="filter-control">
+        <input
+          type="checkbox"
+          checked={showLowStockOnly}
+          onChange={event =>
+            onShowLowStockOnlyChange(
+              event.target.checked,
+            )
+          }
+        />
+
+        Show low-stock items only
+      </label>
+    </div>
+  )
+
   if (items.length === 0) {
     return (
       <section className="card">
-        <h2>Inventory</h2>
-        <p>No inventory items found.</p>
+        {header}
+
+        <p className="muted">
+          {showLowStockOnly
+            ? 'No low-stock inventory items found.'
+            : 'No inventory items found.'}
+        </p>
       </section>
     )
   }
 
   return (
     <section className="card">
-      <h2>Inventory</h2>
+      {header}
 
       <div className="table-wrapper">
         <table>

@@ -66,8 +66,9 @@ Trigger a workflow through either the React client or the structured request fil
 ### React client
 
 1. Sign in as an Operator or Administrator.
-2. Create an item at or below its reorder threshold, or edit an active item so it crosses into a low-stock state.
-3. Note the resulting reorder event and requested quantity in the workflow panel.
+2. Open the **Inventory** view.
+3. Create an item at or below its reorder threshold, or edit an active item so it crosses into a low-stock state.
+4. Open the **Workflow** view and note the resulting reorder event and requested quantity.
 
 The browser request receives an API-generated correlation identifier unless a caller supplies one explicitly. Use the Aspire trace view or API logs to locate the corresponding inventory request.
 
@@ -230,11 +231,11 @@ Confirm that the operations response reports:
 - reorder-event count
 - UTC check time
 
-The React System Health panel performs this request with the current in-memory bearer token.
+The Dashboard’s System Health card performs this request with the current in-memory bearer token and can refresh independently of the summary metrics.
 
 ## Verify Audit Records
 
-Sign in as an Administrator and open the Audit Records panel, or call:
+Sign in as an Administrator and open the **Audit** view, or call:
 
 ```http
 GET /api/audit-records
@@ -358,7 +359,7 @@ Confirm that the account has the expected Viewer, Operator, or Administrator rol
 
 For role or status changes, confirm that the operation would not demote or deactivate the final active Administrator.
 
-For account creation, confirm:
+In the **Administration** view, confirm:
 
 - the email is unique
 - the role is supported

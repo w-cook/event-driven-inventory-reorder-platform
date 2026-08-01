@@ -100,7 +100,7 @@ An Administrator attempts to create a duplicate email address, supplies an unsup
 
 The API rejects the request without creating a partial account.
 
-Account creation uses established ASP.NET Core Identity validation and password hashing. The frontend displays the returned validation or conflict message.
+Account creation uses established ASP.NET Core Identity validation and password hashing. The Administration view preserves the current account list and displays the returned validation or conflict message.
 
 ### Recovery
 
@@ -379,6 +379,24 @@ Existing Identity and database state remains available, but asynchronous workflo
 Restore the emulator and confirm that the API and Processor use the same queue configuration.
 
 Detailed emulator startup troubleshooting belongs in `observability-runbook.md`.
+
+## Frontend Data Load or Refresh Failure
+
+### Scenario
+
+A protected request for inventory, workflow, system-health, audit, or account data fails after the user has authenticated.
+
+### Current Behavior
+
+The client presents a readable error within the affected view or card instead of treating unavailable data as a successful empty result.
+
+System Health maintains its own loading and error state, so a health refresh failure does not hide otherwise available inventory or workflow information. Administrator-only Audit and Administration data is requested only for an Administrator session.
+
+A `401 Unauthorized` response still follows the session-invalidated behavior documented above. Other request failures keep the current session active unless authentication is no longer valid.
+
+### Recovery
+
+Retry the affected request or use the view’s refresh control where one is available. If the failure persists, inspect the API, database, or account authorization state using the observability runbook.
 
 ## Scope Limitations
 

@@ -22,10 +22,27 @@ The React/TypeScript dashboard turns the protected backend into a usable interna
 - inventory, low-stock, workflow, and health summaries
 - configured reorder quantities and immutable per-event request snapshots
 - Operator and Administrator inventory creation and editing
-- Administrator audit and account-management panels
+- dedicated Administrator audit and account-management views
 - readable validation, authorization, and invalidated-session handling
 
 Inventory status calculation, reorder-event creation, account validation, authorization, and audit persistence remain backend responsibilities. Viewer sessions are read-only; successful Operator or Administrator mutations reload inventory, workflow, summary, and health data from the API rather than treating optimistic client state as authoritative.
+
+### Frontend Information Architecture and UX Polish
+
+The earlier frontend exposed useful capabilities, but its single-page presentation made the application feel longer and less deliberate as features accumulated. The Phase 9 redesign separated the interface into Dashboard, Inventory, Workflow, Audit, and Administration views while preserving one authenticated application shell.
+
+The redesign favored information density over decorative whitespace because this is an internal operations interface. Summary metrics and System Health share horizontal space on wide screens, cards use compact spacing, and form controls and table rows remain readable without consuming unnecessary vertical space. At narrower widths, navigation and content stack, while wide tables stay contained and become horizontally scrollable instead of forcing the entire page wider.
+
+The hierarchy was standardized around:
+
+- one persistent application title and session area
+- one active-view heading and description
+- section-level card headings
+- consistent action, loading, empty, success, and error presentation
+
+Semantic navigation, active-view indication, accessible labels, visible focus behavior, and keyboard-operable native controls improve usability without introducing a routing framework or duplicating API authorization logic.
+
+This work illustrates a practical tradeoff: the interface is not a consumer marketing site, so compactness and operational scanability matter more than large presentation spacing. The result supports realistic daily use and produces clearer employer-facing screenshots while remaining maintainable in a small React codebase.
 
 ### Persistent Identity and JWT Authentication
 
@@ -172,7 +189,7 @@ The structured API request file supports a repeatable Aspire-oriented workflow t
 3. reuses named-response access tokens for role-specific requests
 4. verifies authorization, reorder quantities, immutable snapshots, inventory changes, audit records, processing, and health behavior
 
-Phase 8 also included a browser-based role matrix:
+The browser-based role matrix was repeated after the frontend information-architecture work:
 
 - Viewer sessions remained read-only
 - Operator sessions received inventory mutation controls but no audit or account-management panels
@@ -204,7 +221,7 @@ This expansion demonstrates practical engineering concerns that transfer across 
 - ASP.NET Core Identity and signed JWT bearer authentication
 - role-based authorization and controlled account lifecycle management
 - immediate invalidation of stale authorization tokens
-- role-aware React inventory operations and Administrator audit review
+- role-aware, responsive React operations views and Administrator audit review
 - SQL-backed auditing
 - distributed workflow reliability and idempotent message processing
 - duplicate-delivery protection, retry, and dead-letter behavior
