@@ -1,0 +1,6 @@
+@InventoryReorderPlatform.SupplierMockApi_HostAddress = http://localhost:5273
+
+GET {{InventoryReorderPlatform.SupplierMockApi_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
