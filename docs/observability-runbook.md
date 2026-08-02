@@ -1,8 +1,10 @@
 # Observability Runbook
 
-Use this runbook to trace an authenticated reorder workflow across the React client or structured API request file, ASP.NET Core API, Service Bus, and Processor.
+Use this runbook to trace an authenticated reorder workflow across the React client or structured API request file, ASP.NET Core API, Service Bus, and Processor, and to inspect the independently hosted mock supplier service.
 
 For expected system behavior during authentication failures, token invalidation, duplicate delivery, retries, dead-lettering, publication failures, and dependency outages, see `failure-scenarios.md`.
+
+During Phase 10, the correlated inventory workflow ends at the Processor. The mock supplier API is independently observable, but there is no Processor-to-supplier request, supplier child span, or end-to-end supplier trace until Phase 11.
 
 ## Prerequisites
 
@@ -31,7 +33,9 @@ Wait for these Aspire resources to become available:
 
 - `sql`
 - `inventorydb`
+- `supplierdb`
 - `api`
+- `supplier`
 - `processor`
 - `client`
 
@@ -233,6 +237,38 @@ Confirm that the operations response reports:
 
 The Dashboard’s System Health card performs this request with the current in-memory bearer token and can refresh independently of the summary metrics.
 
+### Verify the mock supplier resource
+
+In Aspire, open the `supplier` resource and confirm that it and `supplierdb` are healthy.
+
+The supplier service exposes:
+
+```http
+GET /health
+GET /alive
+GET /openapi/v1.json
+```
+
+In Docker/local mode, use:
+
+```text
+http://localhost:8082/health
+http://localhost:8082/alive
+http://localhost:8082/openapi/v1.json
+```
+
+`/health` includes dependency health, while `/alive` confirms that the supplier process is running. A supplier process may therefore be alive while its database-dependent health check is unhealthy.
+
+For direct supplier-order verification, submit a request with a unique `Idempotency-Key`, then repeat the identical request. Confirm:
+
+- the first request returns `201 Created`
+- the identical replay returns `200 OK`
+- both responses contain the same supplier-order identifier and acceptance time
+- only one accepted order is stored
+
+Review supplier logs for acceptance, replay, simulated transient failure, or permanent rejection entries. These logs and direct HTTP traces belong to the supplier resource during Phase 10; they are not yet correlated children of the inventory reorder trace.
+
+
 ## Verify Audit Records
 
 Sign in as an Administrator and open the **Audit** view, or call:
@@ -425,6 +461,75 @@ Then check for:
 This sequence helps determine whether the workflow stopped during publication, delivery, or processing.
 
 See `failure-scenarios.md` for the expected behavior of each failure category.
+
+### Supplier Resource Is Unhealthy
+
+Confirm that:
+
+- the `supplier` process is running
+- `supplierdb` is available
+- the supplier connection string uses the correct database name
+- the supplier migration applied successfully
+- the configured behavior options pass startup validation
+
+Inspect the supplier resource logs and SQL Server resource logs. Use `/alive` to distinguish a running process from a healthy database dependency.
+
+In Docker/local mode, inspect:
+
+```bash
+docker compose -f docker-compose.local.yml logs supplier
+docker compose -f docker-compose.local.yml logs app-sql
+```
+
+### Supplier Returns 503 Service Unavailable
+
+A `503` response is expected when `SupplierBehavior:Mode` is `TransientFailure` and the configured number of failures has not yet been exhausted.
+
+Confirm the response includes:
+
+```http
+Retry-After: 1
+```
+
+Retry the same payload with the same idempotency key. Do not generate a new key for each attempt. Supplier logs include the simulated attempt number.
+
+Transient-attempt counters are process-local and reset when the supplier restarts. Accepted orders are durable and continue to replay from SQL Server.
+
+### Supplier Returns 422 Unprocessable Entity
+
+A `422` response is expected when `SupplierBehavior:Mode` is `PermanentRejection`.
+
+Inspect the problem-details response and configured rejection message. Confirm that no accepted supplier-order row was created.
+
+During Phase 10, this direct rejection does not update an inventory-platform reorder event because the Processor does not call the supplier yet.
+
+### Supplier Replay Returns 409 Conflict
+
+A `409 Conflict` means an existing idempotency key was reused with a different business payload.
+
+Compare the repeated request with the original accepted request, including:
+
+- reorder-event id
+- inventory-item id
+- SKU
+- requested quantity
+- trigger time
+
+Retry the original payload with the existing key, or use a new key only for a genuinely different supplier order.
+
+### Supplier Does Not Appear in the Reorder Trace
+
+This is expected during Phase 10.
+
+The current distributed reorder trace is:
+
+```text
+Inventory API
+└── PublishReorderMessage
+    └── ProcessReorderMessage
+```
+
+Direct supplier requests generate separate ASP.NET Core and HTTP telemetry under the supplier resource. The Processor-to-supplier span, correlation propagation, and complete API-to-queue-to-Processor-to-supplier trace are Phase 11 work.
 
 ### Service Bus Emulator Does Not Become Ready
 

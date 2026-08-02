@@ -6,17 +6,24 @@ The Event-Driven Inventory Reorder Platform is a distributed .NET business appli
 
 The architecture uses asynchronous message processing for reorder work while preserving SQL-backed business state, ASP.NET Core Identity accounts, audit history, processing records, and failure diagnostics.
 
+The architecture includes separate user-interface, inventory API, authentication, messaging, background-processing, mock external-supplier, observability, and persistence responsibilities.
+
 ```mermaid
 flowchart LR
     User["Viewer / Operator / Administrator"]
+    Developer["Developer / Integration Tests"]
 
     subgraph Client["Operations Client"]
         React["React + TypeScript Operations Client"]
     end
 
-    subgraph Application["Application Services"]
-        API["ASP.NET Core API"]
+    subgraph Application["Inventory Platform Services"]
+        API["ASP.NET Core Inventory API"]
         Processor[".NET Background Processor"]
+    end
+
+    subgraph SupplierBoundary["Mock External Supplier Boundary"]
+        SupplierApi["ASP.NET Core Mock Supplier API"]
     end
 
     subgraph Messaging["Messaging Infrastructure"]
@@ -24,13 +31,17 @@ flowchart LR
         DLQ["Dead-Letter Queue"]
     end
 
-    subgraph Persistence["SQL Server"]
+    subgraph ApplicationPersistence["Inventory Application Database"]
         Identity["Identity Users and Roles"]
         Inventory["Inventory Items"]
         Reorders["Reorder Events and History"]
         Audit["Audit Records"]
         Processed["Processed Message Ledger"]
         Failed["Failed Message Records"]
+    end
+
+    subgraph SupplierPersistence["Supplier Database"]
+        SupplierOrders["Accepted Supplier Orders"]
     end
 
     subgraph Observability["Shared Operations and Diagnostics"]
@@ -44,7 +55,7 @@ flowchart LR
     React -->|"Bearer-authenticated HTTP requests"| API
 
     API --> Identity
-    API -->|"Inventory and workflow state"| Inventory
+    API --> Inventory
     API --> Reorders
     API --> Audit
     API -->|"ReorderRequestedMessage"| Queue
@@ -56,8 +67,12 @@ flowchart LR
     Processor -->|"Retryable failure"| Queue
     Processor -->|"Unprocessable or exhausted message"| DLQ
 
+    Developer -->|"Direct HTTP verification"| SupplierApi
+    SupplierApi --> SupplierOrders
+
     ServiceDefaults -.-> API
     ServiceDefaults -.-> Processor
+    ServiceDefaults -.-> SupplierApi
     ServiceDefaults -.-> Telemetry
 
     API -.->|"Correlation ID and trace context"| Queue
@@ -152,7 +167,26 @@ The Processor:
 
 A `Processed` reorder event represents successful internal handling of the reorder request. It does not represent delivery of physical stock.
 
-### SQL Server
+### Mock Supplier API
+
+The mock supplier API is an independently hosted ASP.NET Core service that provides a realistic external HTTP boundary for development and automated testing.
+
+It:
+
+- accepts supplier-order submissions
+- requires an explicit idempotency key
+- validates supplier-owned request contracts
+- persists accepted orders in its own database
+- returns the original accepted result for an identical replay
+- rejects conflicting reuse of an idempotency key
+- simulates delayed responses, temporary unavailability, and permanent rejection
+- exposes health, liveness, and OpenAPI endpoints
+
+The service does not reference the inventory API, inventory persistence project, Processor, or internal Service Bus contract. Its contracts therefore represent an external-service boundary rather than a shared in-process model.
+
+During Phase 10, the service is exercised directly through HTTP integration tests and local verification. The Processor-to-supplier call is intentionally deferred to Phase 11.
+
+### Persistence Boundaries
 
 SQL Server stores the application’s durable state:
 
@@ -164,11 +198,17 @@ SQL Server stores the application’s durable state:
 - successfully processed message identifiers
 - failed message details
 
+The mock supplier service uses a separate `SupplierDbContext`, migration history, schema, and database for accepted supplier orders.
+
+Aspire and Docker may host both databases through the same local SQL Server resource, but that shared infrastructure does not combine their ownership. The inventory platform and supplier service use separate connection strings, contexts, models, tables, constraints, and migrations.
+
 Identity state, business state, audit state, and message-processing state remain distinct so operators can distinguish account access, inventory conditions, workflow results, and infrastructure outcomes.
 
 ### Observability
 
-Shared Service Defaults configure health checks, structured logging, metrics, and OpenTelemetry instrumentation for the API and Processor.
+Shared Service Defaults configure health checks, structured logging, metrics, and OpenTelemetry instrumentation for the inventory API, Processor, and mock supplier API.
+
+During Phase 10, correlation and W3C trace propagation connect the inventory API, queue, and Processor. Direct supplier requests produce their own service telemetry, but they are not yet children of the reorder workflow trace. That connection is introduced in Phase 11.
 
 Each API request accepts or generates an `X-Correlation-Id`. The identifier and W3C trace context are propagated through the message boundary so a reorder workflow can be followed across the API, queue, and Processor.
 
@@ -178,8 +218,8 @@ Authentication and authorization failures remain normal HTTP request outcomes. S
 
 The same application architecture supports two local development paths:
 
-- **.NET Aspire:** orchestrates the API, Processor, React operations client, SQL Server, health information, logs, metrics, and traces.
-- **Docker/local mode:** runs the backend and infrastructure through Docker Compose while the React client is started separately.
+- **.NET Aspire:** orchestrates the inventory API, Processor, mock supplier API, React operations client, SQL Server, separate inventory and supplier databases, health information, logs, metrics, and traces.
+- **Docker/local mode:** runs the inventory API, Processor, mock supplier API, both databases, and messaging infrastructure through Docker Compose while the React client is started separately.
 
 Both modes use zero-cost local infrastructure and the same Identity, authorization, inventory, and messaging workflow.
 
@@ -192,10 +232,13 @@ The current architecture does not claim:
 - an external production identity provider or single sign-on integration
 - public self-service registration
 - refresh-token rotation or persistent browser sessions
-- a real supplier or purchasing integration
+- a real production supplier or purchasing integration
+- Processor-to-supplier submission during Phase 10
 - exactly-once message delivery
 - automatic receipt of replacement stock
 - paid cloud deployment
 - production hosting
+
+The mock supplier service is intentionally a local development and verification boundary. Its existence demonstrates external-service contract design, idempotency, failure simulation, persistence ownership, and orchestration without claiming a commercial supplier relationship or completed purchasing workflow.
 
 These boundaries keep the portfolio project practical while making its security, reliability, and operational claims fully defensible.

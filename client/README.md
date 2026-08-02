@@ -132,7 +132,7 @@ npm install
 
 ## Running with Aspire
 
-Aspire is the preferred development mode because it starts the client with the API, Processor, and application SQL Server and provides resource health, logs, metrics, and traces.
+Aspire is the preferred development mode because it starts the client alongside the inventory API, Processor, mock supplier API, shared local SQL Server resource, and separate inventory and supplier databases while providing resource health, logs, metrics, and traces.
 
 From the repository root, first start the external Service Bus Emulator dependencies:
 
@@ -318,7 +318,7 @@ The client intentionally does not provide:
 - persistent browser sessions or refresh tokens
 - URL-addressable or deep-linkable application views
 - dead-letter replay controls
-- supplier or purchasing workflows
+- supplier-submission status, confirmation details, or purchasing controls
 - automatic stock receipt
 - password reset, password change, or email-verification workflows
 - production enterprise identity-provider integration

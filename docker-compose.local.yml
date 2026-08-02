@@ -83,6 +83,8 @@ services:
       ServiceBus__ConnectionString: "Endpoint=sb://servicebus-emulator;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true;"
       ServiceBus__QueueName: "reorder-events"
       Jwt__SigningKey: "${JWT_SIGNING_KEY}"
+      BootstrapAdmin__Email: "${BOOTSTRAP_ADMIN_EMAIL}"
+      BootstrapAdmin__Password: "${BOOTSTRAP_ADMIN_PASSWORD}"
     ports:
       - "8080:8080"
     restart: unless-stopped

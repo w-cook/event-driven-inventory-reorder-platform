@@ -1,6 +1,6 @@
 # Failure Scenarios
 
-This document records the platform’s expected behavior when authentication, authorization, message publication, delivery, or processing does not follow the normal successful path.
+This document records the platform’s expected behavior when authentication, authorization, message publication, delivery, processing, or direct mock-supplier submission does not follow the normal successful path.
 
 It describes current behavior and known limitations. Operational investigation steps are documented separately in `observability-runbook.md`.
 
@@ -314,6 +314,179 @@ The project does not currently implement a transactional outbox or an automated 
 
 This is an acknowledged consistency boundary in the current portfolio scope. A production implementation would commonly use a transactional outbox so the business-state change and durable publication intent are committed together.
 
+## Invalid Supplier Order Request
+
+### Scenario
+
+A direct caller submits a supplier-order request with a missing, empty, duplicate, or oversized `Idempotency-Key` header, or supplies an invalid request body such as a blank SKU, non-positive requested quantity, or missing UTC trigger time.
+
+### Current Behavior
+
+The mock supplier API returns `400 Bad Request` and does not create an accepted supplier-order record.
+
+The idempotency header must contain exactly one nonempty value no longer than 200 characters. The SKU is required and limited to 50 characters, `RequestedQuantity` must be positive, and `TriggeredAtUtc` must contain a nondefault UTC value.
+
+### Observable Evidence
+
+The response contains validation or problem-details information describing the invalid request. The supplier database should contain no order for the rejected idempotency key.
+
+### Recovery
+
+Correct the header or request payload and resubmit the request with the intended idempotency key.
+
+### Test Coverage
+
+Supplier API integration tests verify missing-header and invalid-quantity behavior. Other request-validation rules remain enforced by the supplier-owned contract and controller validation path.
+
+## Identical Supplier Order Replay
+
+### Scenario
+
+A caller repeats an already accepted supplier-order request using the same idempotency key and the same business payload.
+
+This can represent a safe retry after the caller did not receive or could not trust the original response.
+
+### Current Behavior
+
+The mock supplier API returns `200 OK` with the original accepted supplier order.
+
+The response preserves the original:
+
+- supplier-order identifier
+- acceptance time
+- submitted payload
+- accepted status
+
+No additional supplier-order row is created.
+
+The service checks for an existing accepted order before applying the configured mock behavior. A later change to delayed, transient-failure, or permanent-rejection mode therefore cannot turn an already accepted order into a simulated failure.
+
+### Observable Evidence
+
+The repeated response contains the same `SupplierOrderId` and `AcceptedAtUtc` as the original `201 Created` response. The supplier database contains one matching row.
+
+### Recovery
+
+No recovery action is required. The replay is the expected idempotent result.
+
+### Test Coverage
+
+Supplier integration tests verify identical replay, single-row persistence, and replay after the configured behavior mode changes.
+
+## Conflicting Supplier Idempotency Key
+
+### Scenario
+
+A caller reuses an accepted idempotency key with a different reorder event, inventory item, SKU, requested quantity, or trigger time.
+
+### Current Behavior
+
+The mock supplier API returns `409 Conflict` and preserves the original accepted order unchanged.
+
+A unique database index on `IdempotencyKey` provides database-level duplicate protection. When concurrent requests race to insert the same key, the controller reloads the persisted record and applies the same identical-replay or conflicting-replay comparison.
+
+### Observable Evidence
+
+The response contains conflict problem details. The supplier database retains only the original accepted order.
+
+### Recovery
+
+Determine whether the caller reused the wrong idempotency key or changed a payload that should have remained stable. Submit a genuinely different supplier order with a new key, or retry the original payload with the existing key.
+
+### Test Coverage
+
+Supplier tests verify conflicting payload behavior and database-level uniqueness enforcement.
+
+## Simulated Transient Supplier Failure
+
+### Scenario
+
+The mock supplier service is configured with `SupplierBehavior:Mode` set to `TransientFailure`, and a direct caller submits a new supplier order.
+
+### Current Behavior
+
+The service returns `503 Service Unavailable` for the configured number of attempts associated with that idempotency key. The response includes:
+
+```http
+Retry-After: 1
+```
+
+No accepted supplier-order record is created during those failed attempts. A later attempt proceeds normally and returns `201 Created`; another identical replay then returns `200 OK`.
+
+Transient attempt counters are held in supplier-process memory. Restarting the supplier process resets counters for requests that have not yet been accepted. Accepted orders remain durable in SQL Server and continue to replay safely after restart.
+
+During Phase 10, this behavior affects only direct supplier callers and supplier integration tests. The Processor does not call the supplier service until Phase 11.
+
+### Observable Evidence
+
+Supplier logs identify the simulated transient failure, idempotency key, and attempt number. Repeated direct requests show the configured sequence of `503`, eventual `201`, and idempotent `200` responses.
+
+### Recovery
+
+For direct verification, retry the same request and idempotency key after the indicated delay. A caller should not generate a new key merely because a response is temporarily unavailable.
+
+Processor-driven retry and Service Bus redelivery behavior for this failure will be implemented in Phase 11.
+
+### Test Coverage
+
+Supplier integration tests verify the configured transient failures, eventual acceptance, later replay, and single accepted database record.
+
+## Simulated Permanent Supplier Rejection
+
+### Scenario
+
+The mock supplier service is configured with `SupplierBehavior:Mode` set to `PermanentRejection`, and a direct caller submits a new supplier order.
+
+### Current Behavior
+
+The service returns `422 Unprocessable Entity` with the configured rejection message. It does not create an accepted supplier-order record.
+
+During Phase 10, this response does not change inventory-platform reorder state because the Processor is not yet connected to the supplier boundary.
+
+### Observable Evidence
+
+The response title identifies a supplier-order rejection and its detail contains the configured message. Supplier logs include the rejected idempotency key, and the supplier database contains no accepted order for that key.
+
+### Recovery
+
+Review the request and configured mock mode. A permanent rejection should not be retried indefinitely as though it were temporary.
+
+The Phase 11 workflow will distinguish permanent rejection from retryable supplier failure and persist the corresponding reorder outcome.
+
+### Test Coverage
+
+Supplier integration tests verify the `422` response, configured rejection message, and absence of a persisted accepted order.
+
+## Supplier Database Unavailable
+
+### Scenario
+
+The mock supplier API cannot connect to its independently owned supplier database during startup, migration, health evaluation, or order acceptance.
+
+### Current Behavior
+
+The supplier service may fail startup migration or fail requests that require persistence. Its `/health` endpoint should report the dependency as unhealthy when the application is running but cannot use the database.
+
+The inventory API and current Processor workflow use a separate application database and remain architecturally independent of the supplier database during Phase 10. A supplier-database outage therefore does not by itself change inventory-platform reorder events until Phase 11 connects the Processor to the supplier.
+
+### Observable Evidence
+
+Inspect:
+
+- the supplier resource health state
+- supplier startup and request logs
+- SQL Server resource health
+- the `supplierdb` or Docker supplier-database connection configuration
+- migration errors
+
+The supplier `/alive` endpoint may remain available even when `/health` reports a database failure.
+
+### Recovery
+
+Restore supplier-database connectivity, confirm that its migration is current, and retry the original request with the same idempotency key.
+
+If the order may have been accepted before the caller observed the failure, an identical replay safely returns the durable accepted result rather than creating another order.
+
 ## Database Unavailable
 
 ### Scenario
@@ -410,6 +583,7 @@ The project currently does not include:
 - automatic republishing of orphaned pending reorder events
 - production alerts or paging
 - production telemetry retention
-- a real supplier-system recovery workflow
+- Processor-to-supplier retry and recovery orchestration
+- a real commercial supplier-system recovery workflow
 
 These limitations are documented so the project demonstrates implemented security and reliability behavior without overstating production completeness.

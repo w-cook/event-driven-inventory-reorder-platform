@@ -8,7 +8,7 @@ The work preserves the original event-driven architecture while adding operator 
 
 ## Current Status
 
-Phases 1–9 are complete. Phase 10 adds a mock external supplier service, Phase 11 integrates supplier submission into the event-driven reorder workflow, and Phase 12 completes API documentation and final verification.
+Phases 1–10 are complete. Phase 11 covers Processor-to-supplier submission, expanded workflow status, observability, and frontend visibility.
 
 ## Phase Completion Standard
 
@@ -130,22 +130,24 @@ The final step of each phase must:
 
 ### Phase 10 — Mock Supplier Service
 
-- [ ] add a separate `InventoryReorderPlatform.SupplierMockApi` ASP.NET Core service
-- [ ] define supplier-order request and response contracts
-- [ ] implement supplier-order submission
-- [ ] require a stable idempotency key for each supplier order
-- [ ] return the original supplier order for duplicate idempotency keys
-- [ ] validate SKU, requested quantity, and reorder identifiers
-- [ ] persist supplier orders independently from inventory-application state
-- [ ] support configurable response delay
-- [ ] support configurable transient failures
-- [ ] support configurable permanent business rejection
-- [ ] expose supplier health endpoints
-- [ ] add the supplier service to the solution
-- [ ] add the supplier service to Aspire orchestration
-- [ ] add the supplier service to Docker/local orchestration
-- [ ] add automated tests for validation, successful acceptance, and idempotency
-- [ ] update all affected documentation
+- [x] independently hosted ASP.NET Core mock supplier service
+- [x] supplier-owned request and response contracts
+- [x] separate supplier EF Core context and database
+- [x] supplier database migration
+- [x] required idempotency-key contract
+- [x] durable identical-replay behavior
+- [x] conflicting-key detection
+- [x] database-level idempotency enforcement
+- [x] configurable normal and delayed behavior
+- [x] configurable transient failures and eventual recovery
+- [x] configurable permanent rejection
+- [x] health, liveness, and OpenAPI endpoints
+- [x] supplier endpoint and persistence integration tests
+- [x] Aspire orchestration
+- [x] Docker/local orchestration
+- [x] durable replay verification across a service restart
+- [x] mock supplier contract and operations documentation
+- [x] all affected README, architecture, failure-scenario, case-study, observability, and client documentation
 
 ### Phase 11 — Supplier Submission Workflow and Visibility
 
