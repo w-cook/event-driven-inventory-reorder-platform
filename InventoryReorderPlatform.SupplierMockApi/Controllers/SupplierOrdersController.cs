@@ -1,3 +1,4 @@
+using InventoryReorderPlatform.SupplierMockApi.Behavior;
 using InventoryReorderPlatform.SupplierMockApi.Contracts;
 using InventoryReorderPlatform.SupplierMockApi.Data;
 using InventoryReorderPlatform.SupplierMockApi.Models;
@@ -13,13 +14,16 @@ public sealed class SupplierOrdersController : ControllerBase
     private const int MaximumIdempotencyKeyLength = 200;
 
     private readonly SupplierDbContext _dbContext;
+    private readonly ISupplierBehaviorSimulator _behaviorSimulator;
     private readonly ILogger<SupplierOrdersController> _logger;
 
     public SupplierOrdersController(
         SupplierDbContext dbContext,
+        ISupplierBehaviorSimulator behaviorSimulator,
         ILogger<SupplierOrdersController> logger)
     {
         _dbContext = dbContext;
+        _behaviorSimulator = behaviorSimulator;
         _logger = logger;
     }
 
@@ -94,6 +98,54 @@ public sealed class SupplierOrdersController : ControllerBase
                 existingOrder,
                 request,
                 normalizedSku);
+        }
+
+        var behaviorResult =
+    await _behaviorSimulator.EvaluateAsync(
+        idempotencyKey,
+        cancellationToken);
+
+        if (behaviorResult.Outcome ==
+            SupplierBehaviorOutcome.TransientFailure)
+        {
+            Response.Headers.Append(
+                "Retry-After",
+                "1");
+
+            _logger.LogWarning(
+                "Simulated transient supplier failure for " +
+                "idempotency key {IdempotencyKey} on attempt " +
+                "{AttemptNumber}.",
+                idempotencyKey,
+                behaviorResult.AttemptNumber);
+
+            return StatusCode(
+                StatusCodes.Status503ServiceUnavailable,
+                new ProblemDetails
+                {
+                    Status =
+                        StatusCodes.Status503ServiceUnavailable,
+                    Title = "Transient supplier failure",
+                    Detail = behaviorResult.Message
+                });
+        }
+
+        if (behaviorResult.Outcome ==
+            SupplierBehaviorOutcome.PermanentRejection)
+        {
+            _logger.LogWarning(
+                "Simulated permanent supplier rejection for " +
+                "idempotency key {IdempotencyKey}.",
+                idempotencyKey);
+
+            return UnprocessableEntity(
+                new ProblemDetails
+                {
+                    Status =
+                        StatusCodes.Status422UnprocessableEntity,
+                    Title = "Supplier order rejected",
+                    Detail = behaviorResult.Message
+                });
         }
 
         var supplierOrder = new SupplierOrder

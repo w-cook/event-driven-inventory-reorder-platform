@@ -1,3 +1,4 @@
+using InventoryReorderPlatform.SupplierMockApi.Behavior;
 using InventoryReorderPlatform.SupplierMockApi.Data;
 using Microsoft.EntityFrameworkCore;
 
@@ -7,6 +8,23 @@ builder.AddServiceDefaults();
 
 builder.AddSqlServerDbContext<SupplierDbContext>(
     connectionName: "supplierdb");
+
+builder.Services
+    .AddOptions<SupplierBehaviorOptions>()
+    .Bind(
+        builder.Configuration.GetSection(
+            SupplierBehaviorOptions.SectionName))
+    .ValidateDataAnnotations()
+    .Validate(
+        options => Enum.IsDefined(
+            typeof(SupplierBehaviorMode),
+            options.Mode),
+        "Supplier behavior mode is invalid.")
+    .ValidateOnStart();
+
+builder.Services.AddSingleton<
+    ISupplierBehaviorSimulator,
+    SupplierBehaviorSimulator>();
 
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
