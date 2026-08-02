@@ -11,6 +11,7 @@
   <ItemGroup>
     <ProjectReference Include="..\InventoryReorderPlatform.Api\InventoryReorderPlatform.Api.csproj" />
     <ProjectReference Include="..\InventoryReorderPlatform.Processor\InventoryReorderPlatform.Processor.csproj" />
+    <ProjectReference Include="..\InventoryReorderPlatform.SupplierMockApi\InventoryReorderPlatform.SupplierMockApi.csproj" />
   </ItemGroup>
 
   <ItemGroup>
