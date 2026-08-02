@@ -1,6 +1,6 @@
 # Event-Driven Inventory Reorder Platform
 
-A distributed .NET business application that models an internal inventory reorder workflow using an ASP.NET Core API, ASP.NET Core Identity, JWT bearer authentication, a background Processor, SQL Server, Azure-compatible queue messaging, role-aware operations, OpenTelemetry diagnostics, and a React/TypeScript dashboard.
+A distributed .NET business application that models an internal inventory reorder workflow using an ASP.NET Core API, ASP.NET Core Identity, JWT bearer authentication, Azure-compatible queue messaging, a background Processor, an independently hosted mock supplier API, SQL Server, role-aware operations, OpenTelemetry diagnostics, and a React/TypeScript dashboard.
 
 The project focuses on practical backend and distributed-system concerns while remaining fully reproducible with local, zero-cost infrastructure.
 
@@ -66,9 +66,11 @@ Inventory items have current stock levels, reorder thresholds, and configurable 
 
 A separate Processor consumes the message, applies duplicate protection, performs the internal reorder-request workflow, records successful processing, and changes the reorder event to `Processed`.
 
+The solution also contains an independently hosted mock supplier API that accepts idempotent supplier-order submissions, persists accepted orders in its own database, and can simulate delays, transient failures, and permanent rejection. Phase 10 establishes and verifies this external HTTP boundary, but the Processor does not call it yet. Processor-to-supplier submission and workflow visibility are introduced in Phase 11.
+
 A processed reorder event does **not** mean that replacement stock has arrived. The Processor does not increase `QuantityOnHand`. The inventory item remains `ReorderPending` until a later inventory update raises its quantity above the reorder threshold.
 
-The project intentionally models a focused internal business platform. It does not claim integration with an external enterprise identity provider, a real supplier integration, automated purchasing, or physical inventory fulfillment.
+The project intentionally models a focused internal business platform. The mock supplier service provides a realistic local integration boundary, but it is not presented as a real purchasing or supplier integration. The project also does not claim integration with an external enterprise identity provider, automated purchasing, or physical inventory fulfillment.
 
 ### Inventory Quantity Semantics
 
@@ -103,6 +105,11 @@ A processed reorder request remains distinct from receiving replacement stock. S
 - immutable workflow snapshots across API, queue, Processor, and persistence boundaries
 - reliable, idempotent message processing
 - retry and dead-letter behavior
+- independently hosted mock external-service boundary
+- idempotent supplier-order acceptance with durable replay protection
+- separate supplier-owned persistence and migrations
+- configurable delayed, transient-failure, and permanent-rejection behavior
+- relational integration tests for HTTP and database-level idempotency
 - SQL-backed audit, processing, and failure records
 - structured logging, correlation identifiers, and OpenTelemetry tracing through .NET Aspire
 - Docker-based local infrastructure
@@ -181,6 +188,29 @@ Valid failures create `FailedMessages` records. Retryable failures are abandoned
 
 This design accepts at-least-once delivery and applies idempotent processing rather than claiming exactly-once messaging.
 
+### Mock Supplier Boundary
+
+`InventoryReorderPlatform.SupplierMockApi` models an external supplier-order HTTP boundary without depending on a paid service or cloud environment.
+
+The service owns its request and response contracts, EF Core context, migrations, accepted-order model, and SQL database. It does not reference the inventory API, shared application data project, Processor, or internal Service Bus message contract.
+
+New supplier submissions require an `Idempotency-Key` header. A valid new request returns `201 Created`. Repeating the same key and payload returns the original accepted order with `200 OK`, while conflicting reuse of an existing key returns `409 Conflict`.
+
+A unique SQL index provides database-level duplicate protection. Accepted supplier orders therefore survive service restarts and do not rely on an in-memory deduplication cache.
+
+The service supports four local simulation modes:
+
+- `Normal`
+- `Delayed`
+- `TransientFailure`
+- `PermanentRejection`
+
+Transient and rejected submissions do not create accepted-order records. Previously accepted submissions are returned before behavior simulation is applied, ensuring that a retry cannot turn an already accepted order into a later simulated failure.
+
+The Processor does not call the supplier service during Phase 10. That integration and the resulting workflow-status visibility are part of Phase 11.
+
+Detailed contracts, status codes, configuration, and verification steps are documented in [Mock Supplier Service](docs/mock-supplier-service.md).
+
 ### Observability
 
 Each API request accepts or generates an `X-Correlation-Id`. The API returns the identifier to the caller, includes it in structured diagnostics, and propagates it through the Service Bus message.
@@ -220,7 +250,7 @@ See [System Architecture](docs/architecture.md) for the component diagram, runti
 
 | Project | Responsibility |
 | --- | --- |
-| `InventoryReorderPlatform.AppHost` | Orchestrates the API, Processor, React/Vite client, and application SQL Server during Aspire development |
+| `InventoryReorderPlatform.AppHost` | Orchestrates the API, Processor, mock supplier API, React/Vite client, and application and supplier databases during Aspire development |
 | `InventoryReorderPlatform.ServiceDefaults` | Provides shared health, logging, metrics, tracing, and OpenTelemetry configuration |
 | `InventoryReorderPlatform.Api` | Provides authentication, account administration, inventory operations, reorder visibility, health reporting, authorization, auditing, and message publication |
 | `InventoryReorderPlatform.Processor` | Consumes reorder messages, applies idempotency, records processing outcomes, retries failures, and dead-letters unprocessable messages |
@@ -229,6 +259,8 @@ See [System Architecture](docs/architecture.md) for the component diagram, runti
 | `InventoryReorderPlatform.Api.Tests` | Contains authentication, authorization, account-management, auditing, middleware, and API workflow integration tests |
 | `InventoryReorderPlatform.Processor.Tests` | Contains processor reliability tests |
 | `client` | Contains the authenticated, role-aware React/TypeScript operations client and its five application views |
+| `InventoryReorderPlatform.SupplierMockApi` | Provides an independently hosted mock supplier-order HTTP boundary with idempotent acceptance, separate persistence, failure simulation, health endpoints, and OpenAPI |
+| `InventoryReorderPlatform.SupplierMockApi.Tests` | Contains supplier endpoint, persistence, idempotency, and configurable-behavior integration tests |
 
 ## Core Workflow
 
@@ -244,6 +276,8 @@ See [System Architecture](docs/architecture.md) for the component diagram, runti
 10. A retryable failure is recorded and abandoned for another delivery attempt.
 11. A repeatedly failing message is moved to the dead-letter queue.
 12. The inventory item remains `ReorderPending` until stock is later updated above the threshold.
+
+The mock supplier service is currently verified independently of this core queue workflow. Phase 11 connects the Processor to the supplier endpoint and expands the reorder lifecycle to distinguish supplier acceptance, rejection, and exhausted submission failures.
 
 The application keeps four related concerns distinct:
 
@@ -295,7 +329,15 @@ The Administrator and manual-test passwords must satisfy the configured Identity
 
 On application startup, the API creates the Viewer, Operator, and Administrator roles. When valid bootstrap credentials are configured, it also creates the initial Administrator if that account does not already exist.
 
-For Docker/local mode, provide the equivalent API configuration through the environment values consumed by the Compose setup. Do not place authentication secrets in tracked frontend environment files.
+For Docker/local mode, copy `.env.example` to an ignored `.env` file and provide local values for:
+
+```dotenv
+JWT_SIGNING_KEY=<long-random-local-signing-key>
+BOOTSTRAP_ADMIN_EMAIL=<local-administrator-email>
+BOOTSTRAP_ADMIN_PASSWORD=<strong-local-administrator-password>
+```
+
+Docker Compose injects these values into the API container. The actual .env file is excluded from source control; only the placeholder .env.example file is tracked.
 
 No secret values are stored in the repository.
 
@@ -305,10 +347,13 @@ Aspire mode is the preferred option for normal development, resource health, str
 
 Aspire runs:
 
-- the ASP.NET Core API
+- the ASP.NET Core inventory API
 - the background Processor
+- the mock supplier API
 - the React/Vite client
-- the application SQL Server and database
+- one local SQL Server resource
+- the inventory application database
+- the independently owned supplier database
 
 The Service Bus Emulator and its SQL dependency remain external local containers.
 
@@ -333,6 +378,8 @@ dotnet run --project InventoryReorderPlatform.AppHost
 ```
 
 Open the Aspire dashboard URL printed in the terminal.
+
+The mock supplier resource exposes health, liveness, and OpenAPI endpoints through its dynamically assigned Aspire address. Its accepted orders are stored in the separate `supplierdb` database.
 
 The `client` resource is started automatically. Open its endpoint from the Aspire dashboard. Aspire supplies the current API endpoint to Vite, so no manual API URL editing is required for the frontend.
 
@@ -379,10 +426,13 @@ Do not add `-v` unless a full local data reset is intended.
 Docker/local mode runs the backend and infrastructure as a complete Compose stack:
 
 - application SQL Server
+- inventory application database
+- independent supplier database
 - Service Bus Emulator
 - Service Bus Emulator SQL dependency
 - Service Bus readiness gating
-- API
+- inventory API
+- mock supplier API
 - Processor
 
 Start the stack from the repository root:
@@ -396,6 +446,20 @@ The API is exposed at:
 
 ```text
 http://localhost:8080
+```
+
+The mock supplier API is exposed at:
+
+```text
+http://localhost:8082
+```
+
+Useful supplier endpoints include:
+
+```text
+http://localhost:8082/health
+http://localhost:8082/alive
+http://localhost:8082/openapi/v1.json
 ```
 
 Start the React client separately:
@@ -417,6 +481,7 @@ Useful backend commands:
 
 ```bash
 docker compose -f docker-compose.local.yml logs -f api
+docker compose -f docker-compose.local.yml logs -f supplier
 docker compose -f docker-compose.local.yml logs -f processor
 docker compose -f docker-compose.local.yml logs servicebus-emulator
 docker compose -f docker-compose.local.yml down
@@ -547,6 +612,13 @@ The automated tests verify:
 - reorder events and messages preserve the requested quantity captured when the workflow begins
 - later inventory configuration changes do not rewrite historical requested quantities
 - duplicate and recovered Processor handling preserve the original requested-quantity snapshot
+- valid supplier-order acceptance and persistence
+- identical idempotent replay returning the original accepted order
+- conflicting idempotency-key reuse
+- database-level uniqueness enforcement
+- delayed supplier responses
+- transient supplier failure followed by recovery
+- permanent supplier rejection without persistence
 
 Run the frontend checks with:
 
@@ -568,8 +640,11 @@ Each document has a focused purpose:
 - [Failure scenarios](docs/failure-scenarios.md) — expected failure behavior, recovery expectations, evidence, and known limitations
 - [Observability runbook](docs/observability-runbook.md) — operational steps for tracing and diagnosing a workflow
 - [Frontend README](client/README.md) — client-specific startup, proxy configuration, environment settings, and scripts
+- [Mock supplier service](docs/mock-supplier-service.md) — supplier contracts, idempotency behavior, simulation modes, persistence ownership, runtime configuration, and automated verification
 
-Phases 1–9 are complete: the project now includes the operations client, Identity/JWT authentication, authorization and auditing, reliable message processing, observability, production-oriented testing, reorder-quantity configuration, privileged operations, and responsive frontend information architecture. Complete endpoint-by-endpoint API documentation and final verification remain tracked in Phase 10.
+Phases 1–10 are complete. The project now also includes an independently hosted mock supplier API with separate persistence, durable idempotency, configurable failure simulation, integration tests, and Aspire and Docker orchestration.
+
+Phase 11 connects the Processor to that supplier boundary and adds supplier-submission status and frontend visibility. Phase 12 remains reserved for complete endpoint documentation and final verification.
 
 ## Scope and Limitations
 
@@ -588,6 +663,10 @@ Phases 1–9 are complete: the project now includes the operations client, Ident
 - Administrator audit and account-management interfaces
 - local health, logs, metrics, and traces
 - configurable reorder quantities and immutable per-event requested-quantity snapshots
+- independently hosted mock supplier HTTP boundary
+- supplier-owned persistence and migrations
+- durable supplier-order idempotency
+- configurable supplier delay, transient failure, and rejection simulation
 - Aspire and Docker-based development modes
 - Azure-compatible, zero-cost local messaging
 
@@ -596,7 +675,8 @@ Phases 1–9 are complete: the project now includes the operations client, Ident
 - external enterprise identity-provider or single-sign-on integration
 - refresh-token infrastructure and persistent browser sessions
 - public self-service registration
-- real purchasing or supplier integrations
+- integration with a real commercial supplier or purchasing platform
+- Processor-to-supplier submission and frontend supplier visibility until Phase 11
 - automated physical inventory receipt
 - automated dead-letter replay
 - transactional outbox processing

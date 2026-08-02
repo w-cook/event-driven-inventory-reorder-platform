@@ -82,8 +82,30 @@ services:
       ConnectionStrings__inventorydb: "Server=app-sql,1433;Database=InventoryReorderPlatformDb;User Id=sa;Password=YourStrongP@ssw0rd1;TrustServerCertificate=True;Encrypt=False"
       ServiceBus__ConnectionString: "Endpoint=sb://servicebus-emulator;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true;"
       ServiceBus__QueueName: "reorder-events"
+      Jwt__SigningKey: "${JWT_SIGNING_KEY}"
+      BootstrapAdmin__Email: "${BOOTSTRAP_ADMIN_EMAIL}"
+      BootstrapAdmin__Password: "${BOOTSTRAP_ADMIN_PASSWORD}"
     ports:
       - "8080:8080"
+    restart: unless-stopped
+
+  supplier:
+    build:
+      context: .
+      dockerfile: InventoryReorderPlatform.SupplierMockApi/Dockerfile
+    depends_on:
+      app-sql:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: "Development"
+      ASPNETCORE_URLS: "http://+:8080"
+      ConnectionStrings__supplierdb: "Server=app-sql,1433;Database=InventoryReorderPlatformSupplierDb;User Id=sa;Password=YourStrongP@ssw0rd1;TrustServerCertificate=True;Encrypt=False"
+      SupplierBehavior__Mode: "Normal"
+      SupplierBehavior__DelayMilliseconds: "1500"
+      SupplierBehavior__TransientFailuresBeforeSuccess: "2"
+      SupplierBehavior__PermanentRejectionMessage: "The supplier rejected the requested order."
+    ports:
+      - "8082:8080"
     restart: unless-stopped
 
   processor:
