@@ -8,7 +8,7 @@ The work preserves the original event-driven architecture while adding operator 
 
 ## Current Status
 
-Phases 1–9 are complete. Phase 10 covers complete API documentation and final verification.
+Phases 1–9 are complete. Phase 10 adds a mock external supplier service, Phase 11 integrates supplier submission into the event-driven reorder workflow, and Phase 12 completes API documentation and final verification.
 
 ## Phase Completion Standard
 
@@ -128,20 +128,74 @@ The final step of each phase must:
 - [x] verify the interface at common desktop and narrow-screen widths
 - [x] update all affected documentation and refresh screenshots where the frontend changed
 
-### Phase 10 — Complete API Documentation and Final Verification
+### Phase 10 — Mock Supplier Service
 
-- [ ] document every public API endpoint
+- [ ] add a separate `InventoryReorderPlatform.SupplierMockApi` ASP.NET Core service
+- [ ] define supplier-order request and response contracts
+- [ ] implement supplier-order submission
+- [ ] require a stable idempotency key for each supplier order
+- [ ] return the original supplier order for duplicate idempotency keys
+- [ ] validate SKU, requested quantity, and reorder identifiers
+- [ ] persist supplier orders independently from inventory-application state
+- [ ] support configurable response delay
+- [ ] support configurable transient failures
+- [ ] support configurable permanent business rejection
+- [ ] expose supplier health endpoints
+- [ ] add the supplier service to the solution
+- [ ] add the supplier service to Aspire orchestration
+- [ ] add the supplier service to Docker/local orchestration
+- [ ] add automated tests for validation, successful acceptance, and idempotency
+- [ ] update all affected documentation
+
+### Phase 11 — Supplier Submission Workflow and Visibility
+
+- [ ] add an `ISupplierOrderClient` abstraction to the Processor
+- [ ] implement supplier submission through a typed `HttpClient`
+- [ ] configure Aspire service discovery for the supplier client
+- [ ] configure the supplier base URL for Docker/local mode
+- [ ] propagate correlation identifiers and distributed trace context to the supplier
+- [ ] submit the stable Service Bus message ID as the supplier idempotency key
+- [ ] submit the supplier order before marking the reorder event processed
+- [ ] persist the supplier order identifier and acceptance details
+- [ ] keep retryable supplier failures eligible for Service Bus redelivery
+- [ ] distinguish retryable failures from permanent supplier rejection
+- [ ] add clear terminal reorder states for accepted and rejected requests
+- [ ] update reorder-event API responses with supplier-submission information
+- [ ] display supplier status and confirmation details in the Workflow view
+- [ ] test successful supplier submission
+- [ ] test delayed supplier responses
+- [ ] test transient supplier failure followed by successful recovery
+- [ ] test that message redelivery cannot create duplicate supplier orders
+- [ ] test permanent supplier rejection
+- [ ] verify traces across API, queue, Processor, and supplier boundaries
+- [ ] update all affected documentation and refresh screenshots where the frontend changed
+
+### Phase 12 — Complete API Documentation and Final Verification
+
+- [ ] document every public inventory-platform and supplier API endpoint
 - [ ] document authentication and authorization requirements
 - [ ] document request and response models
 - [ ] document validation rules and expected status codes
-- [ ] add OpenAPI response metadata and examples where practical
-- [ ] document correlation-header behavior
-- [ ] document health, audit, user-management, and workflow endpoints
-- [ ] update the architecture document for JWT and administration features
-- [ ] update the operational runbook for account bootstrap and token usage
+- [ ] add OpenAPI response metadata and practical examples
+- [ ] document supplier idempotency requirements and outcomes
+- [ ] consolidate correlation-header and trace-propagation documentation
+- [ ] verify documentation coverage for health, audit, account-management, workflow, and supplier endpoints
+- [ ] update the architecture diagram and component responsibilities for the supplier integration
+- [ ] consolidate account bootstrap, token usage, supplier configuration, mock behavior, and recovery procedures in the operational runbook
+- [ ] run `dotnet build`
 - [ ] run the full automated test suite
+- [ ] run the frontend production build
+- [ ] inspect and verify the generated OpenAPI documents
+- [ ] verify normal supplier acceptance
+- [ ] verify delayed supplier behavior
+- [ ] verify transient failure and recovery
+- [ ] verify permanent rejection behavior
+- [ ] verify supplier idempotency under duplicate submission
 - [ ] verify both Aspire and Docker/local runtime modes
+- [ ] verify the complete distributed trace
+- [ ] confirm that no secrets or unsafe mock defaults are committed
 - [ ] complete a final README, screenshots, and portfolio-claims review
+
 
 ## Non-Goals
 
@@ -154,6 +208,9 @@ The final step of each phase must:
 - replacing the existing backend architecture
 - rewriting the worker from scratch
 - changing the project into a generic inventory CRUD app
+- integration with a real commercial supplier or purchasing platform
+- automatic shipment, delivery, or physical stock receipt
+- production-grade supplier credentials, billing, or procurement rules
 
 ## Success Criteria
 
@@ -165,3 +222,7 @@ This expansion is successful if the project clearly demonstrates:
 - observable distributed workflow behavior
 - documented failure scenarios and recovery expectations
 - test coverage for production-style concerns
+- a meaningful external-service boundary that justifies asynchronous processing
+- supplier idempotency across message retries and ambiguous processing outcomes
+- visible supplier acceptance, rejection, delay, and recovery behavior
+- service-to-service HTTP integration with end-to-end correlation and tracing
