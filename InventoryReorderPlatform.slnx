@@ -7,5 +7,6 @@
   <Project Path="InventoryReorderPlatform.Processor.Tests/InventoryReorderPlatform.Processor.Tests.csproj" Id="65e7cf5e-79ea-4e40-962a-5f6d0fe8d8c2" />
   <Project Path="InventoryReorderPlatform.Processor/InventoryReorderPlatform.Processor.csproj" />
   <Project Path="InventoryReorderPlatform.ServiceDefaults/InventoryReorderPlatform.ServiceDefaults.csproj" />
+  <Project Path="InventoryReorderPlatform.SupplierMockApi.Tests/InventoryReorderPlatform.SupplierMockApi.Tests.csproj" />
   <Project Path="InventoryReorderPlatform.SupplierMockApi/InventoryReorderPlatform.SupplierMockApi.csproj" />
 </Solution>

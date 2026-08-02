@@ -24,7 +24,7 @@ using (var scope = app.Services.CreateScope())
         scope.ServiceProvider
             .GetRequiredService<SupplierDbContext>();
 
-    if (dbContext.Database.IsRelational())
+    if (dbContext.Database.IsSqlServer())
     {
         dbContext.Database.Migrate();
     }
