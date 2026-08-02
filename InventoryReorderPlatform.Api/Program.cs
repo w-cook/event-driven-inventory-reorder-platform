@@ -39,9 +39,36 @@ builder.Services
     .AddRoles<IdentityRole>()
     .AddEntityFrameworkStores<AppDbContext>();
 
-builder.Services.Configure<JwtOptions>(
-    builder.Configuration.GetSection(
-        JwtOptions.SectionName));
+builder.Services
+    .AddOptions<JwtOptions>()
+    .Bind(
+        builder.Configuration.GetSection(
+            JwtOptions.SectionName))
+    .Validate(
+        options =>
+            !string.IsNullOrWhiteSpace(
+                options.Issuer),
+        "JWT issuer is required.")
+    .Validate(
+        options =>
+            !string.IsNullOrWhiteSpace(
+                options.Audience),
+        "JWT audience is required.")
+    .Validate(
+        options =>
+            !string.IsNullOrWhiteSpace(
+                options.SigningKey),
+        "JWT signing key is required.")
+    .Validate(
+        options =>
+            Encoding.UTF8.GetByteCount(
+                options.SigningKey) >= 32,
+        "JWT signing key must be at least 32 bytes.")
+    .Validate(
+        options =>
+            options.AccessTokenMinutes > 0,
+        "JWT access-token duration must be positive.")
+    .ValidateOnStart();
 
 builder.Services.AddScoped<
     IJwtTokenService,
