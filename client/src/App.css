@@ -375,6 +375,45 @@ td {
 
 
 /* ==========================================================================
+   Reorder workflow
+   ========================================================================== */
+
+.workflow-table {
+  min-width: 1100px;
+}
+
+.workflow-status-cell {
+  white-space: nowrap;
+}
+
+.supplier-result {
+  display: grid;
+  min-width: 240px;
+  gap: 0.2rem;
+}
+
+.supplier-result p {
+  margin: 0;
+  font-size: 0.84rem;
+  line-height: 1.35;
+}
+
+.supplier-order-id {
+  font-family:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    "Liberation Mono", monospace;
+  font-size: 0.78rem;
+  overflow-wrap: anywhere;
+}
+
+.supplier-rejection {
+  max-width: 360px;
+  color: #991b1b !important;
+  font-weight: 600;
+}
+
+
+/* ==========================================================================
    Buttons, badges, and feedback
    ========================================================================== */
 
@@ -553,18 +592,21 @@ button:disabled {
    ========================================================================== */
 
 .audit-records,
-.account-management {
+.account-management,
+.reorder-workflow {
   margin-top: 0;
 }
 
 .audit-records .section-header,
-.account-management .section-header {
+.account-management .section-header,
+.reorder-workflow .section-header {
   display: block;
   text-align: center;
 }
 
 .audit-records .section-header h3,
-.account-management .section-header h3 {
+.account-management .section-header h3,
+.reorder-workflow .section-header h2 {
   margin: 0 0 0.25rem;
 }
 
@@ -575,7 +617,8 @@ button:disabled {
   text-align: center;
 }
 
-.audit-records .section-header button {
+.audit-records .section-header button,
+.reorder-workflow .section-header button {
   margin-top: 0.4rem;
 }
 

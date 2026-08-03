@@ -37,6 +37,13 @@ function App() {
   const [isLoading, setIsLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
 
+  const [isWorkflowRefreshing, setIsWorkflowRefreshing] = useState(false)
+
+  const [
+    workflowRefreshErrorMessage,
+    setWorkflowRefreshErrorMessage,
+  ] = useState('')
+
   const [systemHealth, setSystemHealth] = useState<SystemHealth | null>(null)
   const [isHealthLoading, setIsHealthLoading] = useState(false)
   const [healthErrorMessage, setHealthErrorMessage] = useState('')
@@ -67,6 +74,9 @@ function App() {
 
       setErrorMessage('')
       setHealthErrorMessage('')
+
+      setIsWorkflowRefreshing(false)
+      setWorkflowRefreshErrorMessage('')
     })
 
     return () => {
@@ -170,6 +180,9 @@ function App() {
 
     setErrorMessage('')
     setHealthErrorMessage('')
+
+    setIsWorkflowRefreshing(false)
+    setWorkflowRefreshErrorMessage('')
   }
 
   function handleHealthRefresh() {
@@ -187,6 +200,30 @@ function App() {
       })
       .finally(() => {
         setIsHealthLoading(false)
+      })
+  }
+
+  function handleWorkflowRefresh() {
+    setIsWorkflowRefreshing(true)
+    setWorkflowRefreshErrorMessage('')
+
+    void Promise.all([
+      listInventoryItems(),
+      listReorderEvents(),
+    ])
+      .then(([loadedItems, loadedReorderEvents]) => {
+        setItems(loadedItems)
+        setReorderEvents(loadedReorderEvents)
+      })
+      .catch(error => {
+        setWorkflowRefreshErrorMessage(
+          error instanceof Error
+            ? error.message
+            : 'Unable to refresh workflow data.',
+        )
+      })
+      .finally(() => {
+        setIsWorkflowRefreshing(false)
       })
   }
 
@@ -415,6 +452,7 @@ function App() {
         <section
           className="app-view"
           aria-labelledby="workflow-view-title"
+          aria-busy={isWorkflowRefreshing}
         >
           <header className="view-header">
             <h2 id="workflow-view-title">
@@ -434,6 +472,11 @@ function App() {
           <ReorderWorkflowPanel
             events={reorderEvents}
             inventoryItems={items}
+            isRefreshing={isWorkflowRefreshing}
+            refreshErrorMessage={
+              workflowRefreshErrorMessage
+            }
+            onRefresh={handleWorkflowRefresh}
           />
         </section>
       )}

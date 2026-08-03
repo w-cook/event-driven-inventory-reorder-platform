@@ -2,6 +2,7 @@
 using InventoryReorderPlatform.Data;
 using InventoryReorderPlatform.Data.Models;
 using InventoryReorderPlatform.Processor.Processing;
+using InventoryReorderPlatform.Processor.Supplier;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -30,8 +31,12 @@ public class ReorderMessageProcessorTests
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
+        var supplierClient =
+            new AcceptingSupplierOrderClient();
+
         var processor = new ReorderMessageProcessor(
             dbContext,
+            supplierClient,
             NullLogger<ReorderMessageProcessor>.Instance);
 
         var message = new ReorderRequestedMessage
@@ -50,18 +55,19 @@ public class ReorderMessageProcessorTests
         var result = await processor.ProcessAsync(
             message,
             messageId,
+            "processor-test-correlation",
             rawPayload,
             deliveryCount: 1,
             cancellationToken);
 
         Assert.Equal(
-            ReorderProcessingOutcome.Processed,
+            ReorderProcessingOutcome.SupplierAccepted,
             result.Outcome);
 
         var savedReorderEvent =
             await dbContext.ReorderEvents.SingleAsync(cancellationToken);
 
-        Assert.Equal("Processed", savedReorderEvent.Status);
+        Assert.Equal(ReorderEventStatuses.SupplierAccepted, savedReorderEvent.Status);
 
         Assert.Equal(
             message.RequestedQuantity,
@@ -81,6 +87,23 @@ public class ReorderMessageProcessorTests
             processedMessage.ProcessedAtUtc);
 
         Assert.Empty(dbContext.FailedMessages);
+
+        Assert.Equal(
+            AcceptingSupplierOrderClient.SupplierOrderId,
+            savedReorderEvent.SupplierOrderId);
+
+        Assert.Equal(
+            "Accepted",
+            savedReorderEvent.SupplierOrderStatus);
+
+        Assert.Equal(
+            AcceptingSupplierOrderClient.AcceptedAtUtc,
+            savedReorderEvent.SupplierAcceptedAtUtc);
+
+        Assert.Null(
+            savedReorderEvent.SupplierRejectionReason);
+
+        Assert.Equal(1, supplierClient.SubmissionCount);
     }
 
     [Fact]
@@ -103,8 +126,12 @@ public class ReorderMessageProcessorTests
         dbContext.ReorderEvents.Add(reorderEvent);
         await dbContext.SaveChangesAsync(cancellationToken);
 
+        var supplierClient =
+            new AcceptingSupplierOrderClient();
+
         var processor = new ReorderMessageProcessor(
             dbContext,
+            supplierClient,
             NullLogger<ReorderMessageProcessor>.Instance);
 
         var message = new ReorderRequestedMessage
@@ -123,6 +150,7 @@ public class ReorderMessageProcessorTests
         var firstResult = await processor.ProcessAsync(
             message,
             messageId,
+            "processor-test-correlation",
             rawPayload,
             deliveryCount: 1,
             cancellationToken);
@@ -130,12 +158,13 @@ public class ReorderMessageProcessorTests
         var secondResult = await processor.ProcessAsync(
             message,
             messageId,
+            "processor-test-correlation",
             rawPayload,
             deliveryCount: 2,
             cancellationToken);
 
         Assert.Equal(
-            ReorderProcessingOutcome.Processed,
+            ReorderProcessingOutcome.SupplierAccepted,
             firstResult.Outcome);
 
         Assert.Equal(
@@ -149,7 +178,7 @@ public class ReorderMessageProcessorTests
             .ToListAsync(cancellationToken);
 
         Assert.Single(reorderEvents);
-        Assert.Equal("Processed", reorderEvents[0].Status);
+        Assert.Equal(ReorderEventStatuses.SupplierAccepted, reorderEvents[0].Status);
         Assert.Equal(
             message.RequestedQuantity,
             reorderEvents[0].RequestedQuantity);
@@ -158,6 +187,8 @@ public class ReorderMessageProcessorTests
         Assert.Equal(messageId, processedMessages[0].MessageId);
 
         Assert.Empty(dbContext.FailedMessages);
+
+        Assert.Equal(1, supplierClient.SubmissionCount);
     }
 
     [Fact]
@@ -167,8 +198,12 @@ public class ReorderMessageProcessorTests
 
         await using var dbContext = CreateDbContext();
 
+        var supplierClient =
+            new AcceptingSupplierOrderClient();
+
         var processor = new ReorderMessageProcessor(
             dbContext,
+            supplierClient,
             NullLogger<ReorderMessageProcessor>.Instance);
 
         var message = new ReorderRequestedMessage
@@ -188,6 +223,7 @@ public class ReorderMessageProcessorTests
         var result = await processor.ProcessAsync(
             message,
             messageId,
+            "processor-test-correlation",
             rawPayload,
             deliveryCount,
             cancellationToken);
@@ -233,8 +269,12 @@ public class ReorderMessageProcessorTests
 
         await using var dbContext = CreateDbContext();
 
+        var supplierClient =
+            new AcceptingSupplierOrderClient();
+
         var processor = new ReorderMessageProcessor(
             dbContext,
+            supplierClient,
             NullLogger<ReorderMessageProcessor>.Instance);
 
         var triggeredAt = DateTime.UtcNow;
@@ -255,6 +295,7 @@ public class ReorderMessageProcessorTests
         var failedResult = await processor.ProcessAsync(
             message,
             messageId,
+            "processor-test-correlation",
             rawPayload,
             deliveryCount: 1,
             cancellationToken);
@@ -288,12 +329,13 @@ public class ReorderMessageProcessorTests
         var recoveredResult = await processor.ProcessAsync(
             message,
             messageId,
+            "processor-test-correlation",
             rawPayload,
             deliveryCount: 2,
             cancellationToken);
 
         Assert.Equal(
-            ReorderProcessingOutcome.Processed,
+            ReorderProcessingOutcome.SupplierAccepted,
             recoveredResult.Outcome);
 
         var reorderEvent =
@@ -301,7 +343,7 @@ public class ReorderMessageProcessorTests
                 .SingleAsync(cancellationToken);
 
         Assert.Equal(
-            "Processed",
+            ReorderEventStatuses.SupplierAccepted,
             reorderEvent.Status);
 
         Assert.Equal(
@@ -333,5 +375,41 @@ public class ReorderMessageProcessorTests
             .Options;
 
         return new AppDbContext(options);
+    }
+
+    private sealed class AcceptingSupplierOrderClient
+        : ISupplierOrderClient
+    {
+        public static readonly Guid SupplierOrderId =
+            Guid.Parse(
+                "b2657c25-146c-4383-82a8-6a46d17445a9");
+
+        public static readonly DateTime AcceptedAtUtc =
+            new(
+                2026,
+                8,
+                3,
+                12,
+                0,
+                0,
+                DateTimeKind.Utc);
+
+        public int SubmissionCount { get; private set; }
+
+        public Task<SupplierOrderSubmissionResult>
+            SubmitOrderAsync(
+                SupplierOrderRequest request,
+                string idempotencyKey,
+                string correlationId,
+                CancellationToken cancellationToken = default)
+        {
+            SubmissionCount++;
+
+            return Task.FromResult(
+                SupplierOrderSubmissionResult.Accepted(
+                    SupplierOrderId,
+                    "Accepted",
+                    AcceptedAtUtc));
+        }
     }
 }

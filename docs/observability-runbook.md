@@ -1,10 +1,10 @@
 # Observability Runbook
 
-Use this runbook to trace an authenticated reorder workflow across the React client or structured API request file, ASP.NET Core API, Service Bus, and Processor, and to inspect the independently hosted mock supplier service.
+Use this runbook to trace an authenticated reorder workflow across the React client or structured API request file, ASP.NET Core API, Service Bus, Processor, typed supplier client, and independently hosted mock supplier service.
 
-For expected system behavior during authentication failures, token invalidation, duplicate delivery, retries, dead-lettering, publication failures, and dependency outages, see `failure-scenarios.md`.
+For expected system behavior during authentication failures, token invalidation, duplicate delivery, retries, dead-lettering, publication failures, supplier rejection, and dependency outages, see `failure-scenarios.md`.
 
-During Phase 10, the correlated inventory workflow ends at the Processor. The mock supplier API is independently observable, but there is no Processor-to-supplier request, supplier child span, or end-to-end supplier trace until Phase 11.
+The complete correlated workflow now extends from the inventory API through the queue and Processor to the supplier HTTP endpoint and back to local persistence and Service Bus settlement.
 
 ## Prerequisites
 
@@ -73,6 +73,7 @@ Trigger a workflow through either the React client or the structured request fil
 2. Open the **Inventory** view.
 3. Create an item at or below its reorder threshold, or edit an active item so it crosses into a low-stock state.
 4. Open the **Workflow** view and note the resulting reorder event and requested quantity.
+5. Use **Refresh workflow** until the supplier outcome appears.
 
 The browser request receives an API-generated correlation identifier unless a caller supplies one explicitly. Use the Aspire trace view or API logs to locate the corresponding inventory request.
 
@@ -93,7 +94,9 @@ Confirm that:
 - the API request succeeds
 - the response includes the expected `X-Correlation-Id`
 - a reorder event is created with the configured requested quantity
-- the event eventually becomes `Processed`
+- the event eventually becomes `SupplierAccepted` or `SupplierRejected`
+- accepted events include the supplier order identifier, status, and acceptance time
+- rejected events include the supplier rejection reason
 - processing does not increase `QuantityOnHand`
 
 A `401 Unauthorized` response indicates a missing, expired, invalidated, or otherwise invalid token. A `403 Forbidden` response indicates that the authenticated account lacks the required role.
@@ -126,12 +129,21 @@ Do not expect logs to contain plaintext passwords, JWT signing keys, password ha
 
 Open the Processor logs and search for the same correlation identifier.
 
-A successful workflow should contain:
+A successful accepted workflow should contain entries similar to:
 
 ```text
 Received reorder message
-Processed reorder message
-Completed processed message
+Supplier accepted order
+Handled reorder message ... SupplierAccepted
+Completed supplier-accepted message
+```
+
+A permanent rejection should contain:
+
+```text
+Supplier permanently rejected reorder event
+Handled reorder message ... SupplierRejected
+Completed permanently rejected message
 ```
 
 Confirm that the entries share:
@@ -139,6 +151,7 @@ Confirm that the entries share:
 - the same correlation identifier
 - the same stable message id
 - the expected reorder-event id
+- the supplier idempotency key derived from the message id
 
 Other possible lifecycle entries include:
 
@@ -149,6 +162,21 @@ Dead-lettered message
 ```
 
 The meaning and recovery expectations for those outcomes are documented in `failure-scenarios.md`.
+
+## Search the Supplier Logs
+
+Open the `supplier` resource logs and search for the same correlation identifier.
+
+For an accepted workflow, confirm that the supplier log includes:
+
+- accepted supplier order identifier
+- reorder-event identifier
+- idempotency key
+- correlation identifier
+
+For simulated transient failure, confirm that the log includes the attempt number and same idempotency key. For permanent rejection, confirm that the configured rejection is logged under the same correlation identifier.
+
+The Processor typed-client log and supplier-service log should both appear in the global Aspire log search, making the HTTP boundary visible from both sides.
 
 ## Inspect the Distributed Trace
 
@@ -176,9 +204,10 @@ The application-owned trace flow should resemble:
 POST or PUT /api/inventoryitems
 └── PublishReorderMessage
     └── ProcessReorderMessage
+        └── POST /api/supplier-orders
 ```
 
-Depending on instrumentation and timing, the display may contain additional framework or messaging spans.
+Depending on instrumentation and timing, the display may contain additional framework, SQL, messaging, or HTTP spans.
 
 The preceding login request appears as a separate HTTP trace. It is not part of the asynchronous reorder trace because authentication and the later inventory mutation are separate requests.
 
@@ -199,13 +228,16 @@ inventory.item.id
 reorder.event.id
 reorder.outcome
 messaging.settlement
+http.request.method
+server.address
+http.response.status_code
 ```
 
 Not every attribute applies to every span.
 
 The producer activity should identify the publication operation and message destination.
 
-The consumer activity should identify the processing result and settlement outcome.
+The consumer activity should identify the supplier result and Service Bus settlement outcome. The child HTTP span should identify the supplier request and response status.
 
 Sensitive authentication material must not be added as trace attributes.
 
@@ -259,15 +291,19 @@ http://localhost:8082/openapi/v1.json
 
 `/health` includes dependency health, while `/alive` confirms that the supplier process is running. A supplier process may therefore be alive while its database-dependent health check is unhealthy.
 
-For direct supplier-order verification, submit a request with a unique `Idempotency-Key`, then repeat the identical request. Confirm:
+For integrated supplier verification, create a low-stock item and confirm:
 
-- the first request returns `201 Created`
-- the identical replay returns `200 OK`
-- both responses contain the same supplier-order identifier and acceptance time
-- only one accepted order is stored
+- the Processor sends the stable message id as `Idempotency-Key`
+- the Processor sends the workflow `X-Correlation-Id`
+- a normal new request returns `201 Created`
+- the inventory reorder event becomes `SupplierAccepted`
+- the event stores the supplier order identifier, status, and acceptance time
+- the supplier database contains one accepted order
+- `QuantityOnHand` remains unchanged
 
-Review supplier logs for acceptance, replay, simulated transient failure, or permanent rejection entries. These logs and direct HTTP traces belong to the supplier resource during Phase 10; they are not yet correlated children of the inventory reorder trace.
+For direct idempotency verification, repeat an accepted request with the same key and payload. Confirm that `200 OK` returns the original supplier order and no additional row is created.
 
+Review supplier logs for acceptance, replay, simulated transient failure, or permanent rejection under the same correlation identifier used by the inventory workflow.
 
 ## Verify Audit Records
 
@@ -456,9 +492,13 @@ Then check for:
 
 1. a successful publication log
 2. a Processor receipt log
-3. a processing or failure log
+3. a supplier-client submission log
+4. a supplier-service response or failure log
+5. a Processor persistence and settlement log
 
-This sequence helps determine whether the workflow stopped during publication, delivery, or processing.
+This sequence helps determine whether the workflow stopped during publication, delivery, supplier submission, local persistence, or settlement.
+
+A retryable supplier or database failure intentionally leaves the event `Pending`. Use the Workflow History refresh control after the next Service Bus delivery completes.
 
 See `failure-scenarios.md` for the expected behavior of each failure category.
 
@@ -491,9 +531,19 @@ Confirm the response includes:
 Retry-After: 1
 ```
 
-Retry the same payload with the same idempotency key. Do not generate a new key for each attempt. Supplier logs include the simulated attempt number.
+The typed client treats the response as a technical failure. The Processor records a failed attempt, leaves the reorder event `Pending`, and the Worker abandons the Service Bus message. Redelivery uses the same payload and idempotency key.
 
 Transient-attempt counters are process-local and reset when the supplier restarts. Accepted orders are durable and continue to replay from SQL Server.
+
+Search all logs using the correlation identifier to confirm the sequence of `503`, abandonment, redelivery, eventual acceptance, and completion.
+
+### Delayed Supplier Request Is Canceled
+
+A moderate configured delay should complete before the HTTP attempt timeout. An excessive delay can cause the Processor to cancel the request.
+
+The supplier may surface `TaskCanceledException` from its delay because the request cancellation token was triggered by the caller timeout. Treat this as a retryable technical failure rather than a supplier business rejection.
+
+For successful delayed-response verification, use a delay below the current HTTP attempt timeout, such as five seconds. A longer delay can be used deliberately to verify timeout, failure recording, and redelivery behavior.
 
 ### Supplier Returns 422 Unprocessable Entity
 
@@ -501,7 +551,15 @@ A `422` response is expected when `SupplierBehavior:Mode` is `PermanentRejection
 
 Inspect the problem-details response and configured rejection message. Confirm that no accepted supplier-order row was created.
 
-During Phase 10, this direct rejection does not update an inventory-platform reorder event because the Processor does not call the supplier yet.
+The Processor should persist:
+
+```text
+Status = SupplierRejected
+SupplierOrderStatus = Rejected
+SupplierRejectionReason = <configured detail>
+```
+
+The Service Bus message should be completed rather than abandoned because permanent rejection is a handled terminal business outcome. Refresh Workflow History to view the rejection.
 
 ### Supplier Replay Returns 409 Conflict
 
@@ -519,17 +577,27 @@ Retry the original payload with the existing key, or use a new key only for a ge
 
 ### Supplier Does Not Appear in the Reorder Trace
 
-This is expected during Phase 10.
+This is no longer expected for a successful current workflow.
 
-The current distributed reorder trace is:
+The distributed trace should include:
 
 ```text
 Inventory API
 └── PublishReorderMessage
     └── ProcessReorderMessage
+        └── POST /api/supplier-orders
 ```
 
-Direct supplier requests generate separate ASP.NET Core and HTTP telemetry under the supplier resource. The Processor-to-supplier span, correlation propagation, and complete API-to-queue-to-Processor-to-supplier trace are Phase 11 work.
+If the supplier span is missing, confirm that:
+
+- the Processor is using the registered typed `HttpClient`
+- shared HTTP client instrumentation is enabled
+- the Processor resolves the configured supplier base URL
+- the supplier request was actually attempted
+- the consumer activity remained current while the HTTP request was sent
+- the Processor and supplier export telemetry to the Aspire dashboard
+
+Use correlated structured logs to distinguish a missing trace export from a missing supplier request.
 
 ### Service Bus Emulator Does Not Become Ready
 

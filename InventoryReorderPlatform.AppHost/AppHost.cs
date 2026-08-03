@@ -12,17 +12,21 @@ var api = builder
     .WithReference(inventorydb)
     .WaitFor(inventorydb);
 
-builder
-    .AddProject<Projects.InventoryReorderPlatform_SupplierMockApi>(
+var supplier = builder
+    .AddProject<
+        Projects.InventoryReorderPlatform_SupplierMockApi>(
         "supplier")
     .WithReference(supplierdb)
     .WaitFor(supplierdb);
 
 builder
-    .AddProject<Projects.InventoryReorderPlatform_Processor>(
+    .AddProject<
+        Projects.InventoryReorderPlatform_Processor>(
         "processor")
     .WithReference(inventorydb)
-    .WaitFor(inventorydb);
+    .WithReference(supplier)
+    .WaitFor(inventorydb)
+    .WaitFor(supplier);
 
 builder
     .AddViteApp("client", "../client")

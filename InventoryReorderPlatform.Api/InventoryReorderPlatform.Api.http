@@ -13,13 +13,16 @@
 @initialReorderCorrelationId=manual-reorder-create-001
 @transitionReorderCorrelationId=manual-reorder-update-001
 
-// Inventory Reorder Platform — Manual API Verification
+// Inventory Reorder Platform â€” Manual API Verification
 //
 // Assumptions:
 // - The database is empty before beginning.
 // - Either the full Docker/local stack or the Aspire AppHost is running.
 // - InventoryReorderPlatform.Api_HostAddress points to the active API endpoint.
 // - The Service Bus emulator is ready.
+// - The mock supplier service is running and healthy.
+// - SupplierBehavior mode is Normal for this deterministic workflow.
+// - The Processor can reach the supplier endpoint.
 // - Requests are executed from top to bottom.
 //
 // Authentication:
@@ -33,8 +36,16 @@
 // Observability verification:
 //
 // Use initialReorderCorrelationId and transitionReorderCorrelationId to search
-// the API and Processor logs in Aspire. The corresponding trace should include
-// PublishReorderMessage and ProcessReorderMessage.
+// the API, Processor, typed supplier client, and supplier API logs in Aspire.
+// The same correlation identifier should appear across the API publication,
+// Service Bus message, Processor receipt and handling, supplier submission,
+// supplier acceptance, and Processor completion.
+//
+// The corresponding trace should include:
+// - POST or PUT /api/inventoryitems
+// - PublishReorderMessage
+// - ProcessReorderMessage
+// - POST /api/supplier-orders
 //
 // See docs/observability-runbook.md for the complete debugging procedure.
 
@@ -367,11 +378,14 @@ Authorization: Bearer {{adminLogin.response.body.$.accessToken}}
 // - One reorder event is created
 // - One Service Bus message is published
 // - Response X-Correlation-Id matches initialReorderCorrelationId
-// - API and Processor telemetry share the correlation identifier
+// - API, Processor, supplier client, and supplier service logs share the
+//   correlation identifier
+// - The distributed trace includes the supplier HTTP request
 //
 // The reorder event may briefly appear as Pending. After the Processor
-// consumes the message, the event should become Processed. The inventory
-// item remains ReorderPending because its quantity is still below threshold.
+// submits it successfully, the event should become SupplierAccepted. The
+// inventory item remains ReorderPending because supplier acceptance does not
+// increase physical stock and its quantity is still below threshold.
 
 POST {{InventoryReorderPlatform.Api_HostAddress}}/api/inventoryitems
 Content-Type: application/json
@@ -472,7 +486,11 @@ Authorization: Bearer {{viewerLogin.response.body.$.accessToken}}
 // - inventoryItemId: 2
 // - quantityAtTrigger: 3
 // - requestedQuantity: 20
-// - status eventually becomes Processed
+// - status eventually becomes SupplierAccepted
+// - supplierOrderId is populated
+// - supplierOrderStatus is Accepted
+// - supplierAcceptedAtUtc is populated
+// - supplierRejectionReason is null
 
 GET {{InventoryReorderPlatform.Api_HostAddress}}/api/reorderevents
 Accept: application/json
@@ -566,7 +584,9 @@ Authorization: Bearer {{adminLogin.response.body.$.accessToken}}
 // - A second reorder event is created
 // - A second Service Bus message is published
 // - Response X-Correlation-Id matches transitionReorderCorrelationId
-// - API and Processor telemetry share the correlation identifier
+// - API, Processor, supplier client, and supplier service logs share the
+//   correlation identifier
+// - The distributed trace includes the supplier HTTP request
 
 PUT {{InventoryReorderPlatform.Api_HostAddress}}/api/inventoryitems/{{activeItemId}}
 Content-Type: application/json
@@ -601,9 +621,15 @@ Authorization: Bearer {{viewerLogin.response.body.$.accessToken}}
 // - Two total reorder events
 // - One event for item 1
 // - One event for item 2
-// - item 2 quantityAtTrigger: 4
-// - item 2 requestedQuantity: 10
-// - Both eventually become Processed
+// - item 1 quantityAtTrigger: 4
+// - item 1 requestedQuantity: 10
+// - item 2 quantityAtTrigger: 3
+// - item 2 requestedQuantity: 20
+// - Both eventually become SupplierAccepted
+// - Both have populated supplierOrderId values
+// - Both have supplierOrderStatus: Accepted
+// - Both have populated supplierAcceptedAtUtc values
+// - Both have supplierRejectionReason: null
 
 GET {{InventoryReorderPlatform.Api_HostAddress}}/api/reorderevents
 Accept: application/json
@@ -1004,7 +1030,11 @@ Authorization: Bearer {{viewerLogin.response.body.$.accessToken}}
 // - Two total reorder events
 // - One event for item 1
 // - One event for item 2
-// - Both eventually have status: Processed
+// - Both eventually have status: SupplierAccepted
+// - Both have supplierOrderId values
+// - Both have supplierOrderStatus: Accepted
+// - Both have supplierAcceptedAtUtc values
+// - Both have supplierRejectionReason: null
 
 GET {{InventoryReorderPlatform.Api_HostAddress}}/api/reorderevents
 Accept: application/json

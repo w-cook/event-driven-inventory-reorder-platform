@@ -117,8 +117,11 @@ services:
         condition: service_healthy
       servicebus-ready:
         condition: service_completed_successfully
+      supplier:
+        condition: service_started
     environment:
       ConnectionStrings__inventorydb: "Server=app-sql,1433;Database=InventoryReorderPlatformDb;User Id=sa;Password=YourStrongP@ssw0rd1;TrustServerCertificate=True;Encrypt=False"
       ServiceBus__ConnectionString: "Endpoint=sb://servicebus-emulator;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true;"
       ServiceBus__QueueName: "reorder-events"
+      Supplier__BaseUrl: "http://supplier:8080"
     restart: unless-stopped

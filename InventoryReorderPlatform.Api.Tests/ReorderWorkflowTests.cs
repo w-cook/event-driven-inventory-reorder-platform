@@ -1,5 +1,4 @@
 ﻿extern alias processor;
-
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -7,13 +6,20 @@ using InventoryReorderPlatform.Api.DTOs;
 using InventoryReorderPlatform.Api.Security;
 using InventoryReorderPlatform.Api.Services;
 using InventoryReorderPlatform.Data;
+using InventoryReorderPlatform.Data.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
+using ISupplierOrderClient =
+    processor::InventoryReorderPlatform.Processor.Supplier.ISupplierOrderClient;
 using ReorderMessageProcessor =
     processor::InventoryReorderPlatform.Processor.Processing.ReorderMessageProcessor;
 using ReorderProcessingOutcome =
     processor::InventoryReorderPlatform.Processor.Processing.ReorderProcessingOutcome;
+using SupplierOrderRequest =
+    processor::InventoryReorderPlatform.Processor.Supplier.SupplierOrderRequest;
+using SupplierOrderSubmissionResult =
+    processor::InventoryReorderPlatform.Processor.Supplier.SupplierOrderSubmissionResult;
 
 namespace InventoryReorderPlatform.Api.Tests;
 
@@ -228,8 +234,12 @@ public sealed class ReorderWorkflowTests
             scope.ServiceProvider
                 .GetRequiredService<AppDbContext>();
 
+        var supplierClient =
+            new AcceptingSupplierOrderClient();
+
         var processor = new ReorderMessageProcessor(
             dbContext,
+            supplierClient,
             NullLogger<ReorderMessageProcessor>.Instance);
 
         var messageId =
@@ -242,12 +252,13 @@ public sealed class ReorderWorkflowTests
             await processor.ProcessAsync(
                 publishedMessage,
                 messageId,
+                "api-workflow-test-correlation",
                 rawPayload,
                 deliveryCount: 1,
                 cancellationToken);
 
         Assert.Equal(
-            ReorderProcessingOutcome.Processed,
+            ReorderProcessingOutcome.SupplierAccepted,
             processingResult.Outcome);
 
         var reorderEvent =
@@ -264,7 +275,7 @@ public sealed class ReorderWorkflowTests
             reorderEvent.InventoryItemId);
 
         Assert.Equal(
-            "Processed",
+            ReorderEventStatuses.SupplierAccepted,
             reorderEvent.Status);
 
         Assert.Equal(
@@ -435,5 +446,184 @@ public sealed class ReorderWorkflowTests
 
         Assert.Single(
             _factory.MessagePublisher.Messages);
+    }
+
+    [Fact]
+    public async Task ReorderEvents_ReturnSupplierSubmissionDetails()
+    {
+        var cancellationToken =
+            TestContext.Current.CancellationToken;
+
+        var acceptedSupplierOrderId =
+            Guid.NewGuid();
+
+        var acceptedAtUtc = new DateTime(
+            2026,
+            8,
+            3,
+            13,
+            0,
+            0,
+            DateTimeKind.Utc);
+
+        int acceptedEventId;
+        int rejectedEventId;
+
+        using (var scope =
+            _factory.Services.CreateScope())
+        {
+            var dbContext =
+                scope.ServiceProvider
+                    .GetRequiredService<AppDbContext>();
+
+            var inventoryItem = new InventoryItem
+            {
+                Name = "Supplier Visibility Item",
+                Sku =
+                    $"SUPPLIER-VISIBILITY-" +
+                    $"{Guid.NewGuid():N}",
+                QuantityOnHand = 2,
+                ReorderThreshold = 5,
+                ReorderQuantity = 20,
+                Status = "ReorderPending",
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+
+            dbContext.InventoryItems.Add(inventoryItem);
+
+            await dbContext.SaveChangesAsync(
+                cancellationToken);
+
+            var acceptedEventEntity = new ReorderEvent
+            {
+                InventoryItemId = inventoryItem.Id,
+                QuantityAtTrigger = 2,
+                RequestedQuantity = 20,
+                TriggeredAt = acceptedAtUtc.AddMinutes(-5),
+                Status = ReorderEventStatuses.SupplierAccepted,
+                SupplierOrderId = acceptedSupplierOrderId,
+                SupplierOrderStatus = "Accepted",
+                SupplierAcceptedAtUtc = acceptedAtUtc
+            };
+
+            var rejectedEventEntity = new ReorderEvent
+            {
+                InventoryItemId = inventoryItem.Id,
+                QuantityAtTrigger = 1,
+                RequestedQuantity = 20,
+                TriggeredAt = acceptedAtUtc.AddMinutes(-10),
+                Status = ReorderEventStatuses.SupplierRejected,
+                SupplierOrderStatus = "Rejected",
+                SupplierRejectionReason =
+                    "The requested SKU is unavailable."
+            };
+
+            dbContext.ReorderEvents.AddRange(
+                acceptedEventEntity,
+                rejectedEventEntity);
+
+            await dbContext.SaveChangesAsync(
+                cancellationToken);
+
+            acceptedEventId = acceptedEventEntity.Id;
+            rejectedEventId = rejectedEventEntity.Id;
+        }
+
+        var authenticated =
+            await TestAuthentication
+                .CreateAuthenticatedClientAsync(
+                    _factory,
+                    AppRoles.Viewer,
+                    cancellationToken);
+
+        using var client = authenticated.Client;
+
+        var response = await client.GetAsync(
+            "/api/reorderevents",
+            cancellationToken);
+
+        Assert.Equal(
+            HttpStatusCode.OK,
+            response.StatusCode);
+
+        var events =
+            await response.Content
+                .ReadFromJsonAsync<
+                    List<ReorderEventResponse>>(
+                    cancellationToken:
+                        cancellationToken);
+
+        Assert.NotNull(events);
+
+        var acceptedEvent = Assert.Single(
+            events,
+            item => item.Id == acceptedEventId);
+
+        Assert.Equal(
+            ReorderEventStatuses.SupplierAccepted,
+            acceptedEvent.Status);
+
+        Assert.Equal(
+            acceptedSupplierOrderId,
+            acceptedEvent.SupplierOrderId);
+
+        Assert.Equal(
+            "Accepted",
+            acceptedEvent.SupplierOrderStatus);
+
+        Assert.Equal(
+            acceptedAtUtc,
+            acceptedEvent.SupplierAcceptedAtUtc);
+
+        Assert.Null(
+            acceptedEvent.SupplierRejectionReason);
+
+        var rejectedEvent = Assert.Single(
+            events,
+            item => item.Id == rejectedEventId);
+
+        Assert.Equal(
+            ReorderEventStatuses.SupplierRejected,
+            rejectedEvent.Status);
+
+        Assert.Null(rejectedEvent.SupplierOrderId);
+
+        Assert.Equal(
+            "Rejected",
+            rejectedEvent.SupplierOrderStatus);
+
+        Assert.Null(
+            rejectedEvent.SupplierAcceptedAtUtc);
+
+        Assert.Equal(
+            "The requested SKU is unavailable.",
+            rejectedEvent.SupplierRejectionReason);
+    }
+
+    private sealed class AcceptingSupplierOrderClient
+        : ISupplierOrderClient
+    {
+        public Task<SupplierOrderSubmissionResult>
+            SubmitOrderAsync(
+                SupplierOrderRequest request,
+                string idempotencyKey,
+                string correlationId,
+                CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(
+                SupplierOrderSubmissionResult.Accepted(
+                    Guid.Parse(
+                        "ea49e210-aedd-4eb8-94a8-c266670ef9ec"),
+                    "Accepted",
+                    new DateTime(
+                        2026,
+                        8,
+                        3,
+                        12,
+                        0,
+                        0,
+                        DateTimeKind.Utc)));
+        }
     }
 }

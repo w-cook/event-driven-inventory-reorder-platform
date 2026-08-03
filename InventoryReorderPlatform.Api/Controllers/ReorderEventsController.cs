@@ -31,7 +31,11 @@ namespace InventoryReorderPlatform.Api.Controllers
                     QuantityAtTrigger = r.QuantityAtTrigger,
                     RequestedQuantity = r.RequestedQuantity,
                     TriggeredAt = r.TriggeredAt,
-                    Status = r.Status
+                    Status = r.Status,
+                    SupplierOrderId = r.SupplierOrderId,
+                    SupplierOrderStatus = r.SupplierOrderStatus,
+                    SupplierAcceptedAtUtc = r.SupplierAcceptedAtUtc,
+                    SupplierRejectionReason = r.SupplierRejectionReason
                 })
                 .ToListAsync();
 

@@ -7,6 +7,7 @@ public interface IReorderMessageProcessor
     Task<ReorderProcessingResult> ProcessAsync(
         ReorderRequestedMessage message,
         string messageId,
+        string correlationId,
         string? rawPayload,
         int deliveryCount,
         CancellationToken cancellationToken = default);
