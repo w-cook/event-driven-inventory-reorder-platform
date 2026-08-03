@@ -448,6 +448,159 @@ public sealed class ReorderWorkflowTests
             _factory.MessagePublisher.Messages);
     }
 
+    [Fact]
+    public async Task ReorderEvents_ReturnSupplierSubmissionDetails()
+    {
+        var cancellationToken =
+            TestContext.Current.CancellationToken;
+
+        var acceptedSupplierOrderId =
+            Guid.NewGuid();
+
+        var acceptedAtUtc = new DateTime(
+            2026,
+            8,
+            3,
+            13,
+            0,
+            0,
+            DateTimeKind.Utc);
+
+        int acceptedEventId;
+        int rejectedEventId;
+
+        using (var scope =
+            _factory.Services.CreateScope())
+        {
+            var dbContext =
+                scope.ServiceProvider
+                    .GetRequiredService<AppDbContext>();
+
+            var inventoryItem = new InventoryItem
+            {
+                Name = "Supplier Visibility Item",
+                Sku =
+                    $"SUPPLIER-VISIBILITY-" +
+                    $"{Guid.NewGuid():N}",
+                QuantityOnHand = 2,
+                ReorderThreshold = 5,
+                ReorderQuantity = 20,
+                Status = "ReorderPending",
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+
+            dbContext.InventoryItems.Add(inventoryItem);
+
+            await dbContext.SaveChangesAsync(
+                cancellationToken);
+
+            var acceptedEventEntity = new ReorderEvent
+            {
+                InventoryItemId = inventoryItem.Id,
+                QuantityAtTrigger = 2,
+                RequestedQuantity = 20,
+                TriggeredAt = acceptedAtUtc.AddMinutes(-5),
+                Status = ReorderEventStatuses.SupplierAccepted,
+                SupplierOrderId = acceptedSupplierOrderId,
+                SupplierOrderStatus = "Accepted",
+                SupplierAcceptedAtUtc = acceptedAtUtc
+            };
+
+            var rejectedEventEntity = new ReorderEvent
+            {
+                InventoryItemId = inventoryItem.Id,
+                QuantityAtTrigger = 1,
+                RequestedQuantity = 20,
+                TriggeredAt = acceptedAtUtc.AddMinutes(-10),
+                Status = ReorderEventStatuses.SupplierRejected,
+                SupplierOrderStatus = "Rejected",
+                SupplierRejectionReason =
+                    "The requested SKU is unavailable."
+            };
+
+            dbContext.ReorderEvents.AddRange(
+                acceptedEventEntity,
+                rejectedEventEntity);
+
+            await dbContext.SaveChangesAsync(
+                cancellationToken);
+
+            acceptedEventId = acceptedEventEntity.Id;
+            rejectedEventId = rejectedEventEntity.Id;
+        }
+
+        var authenticated =
+            await TestAuthentication
+                .CreateAuthenticatedClientAsync(
+                    _factory,
+                    AppRoles.Viewer,
+                    cancellationToken);
+
+        using var client = authenticated.Client;
+
+        var response = await client.GetAsync(
+            "/api/reorderevents",
+            cancellationToken);
+
+        Assert.Equal(
+            HttpStatusCode.OK,
+            response.StatusCode);
+
+        var events =
+            await response.Content
+                .ReadFromJsonAsync<
+                    List<ReorderEventResponse>>(
+                    cancellationToken:
+                        cancellationToken);
+
+        Assert.NotNull(events);
+
+        var acceptedEvent = Assert.Single(
+            events,
+            item => item.Id == acceptedEventId);
+
+        Assert.Equal(
+            ReorderEventStatuses.SupplierAccepted,
+            acceptedEvent.Status);
+
+        Assert.Equal(
+            acceptedSupplierOrderId,
+            acceptedEvent.SupplierOrderId);
+
+        Assert.Equal(
+            "Accepted",
+            acceptedEvent.SupplierOrderStatus);
+
+        Assert.Equal(
+            acceptedAtUtc,
+            acceptedEvent.SupplierAcceptedAtUtc);
+
+        Assert.Null(
+            acceptedEvent.SupplierRejectionReason);
+
+        var rejectedEvent = Assert.Single(
+            events,
+            item => item.Id == rejectedEventId);
+
+        Assert.Equal(
+            ReorderEventStatuses.SupplierRejected,
+            rejectedEvent.Status);
+
+        Assert.Null(rejectedEvent.SupplierOrderId);
+
+        Assert.Equal(
+            "Rejected",
+            rejectedEvent.SupplierOrderStatus);
+
+        Assert.Null(
+            rejectedEvent.SupplierAcceptedAtUtc);
+
+        Assert.Equal(
+            "The requested SKU is unavailable.",
+            rejectedEvent.SupplierRejectionReason);
+    }
+
     private sealed class AcceptingSupplierOrderClient
         : ISupplierOrderClient
     {

@@ -8,4 +8,8 @@ export interface ReorderEvent {
   requestedQuantity: number
   triggeredAt: string
   status: string
+  supplierOrderId: string | null
+  supplierOrderStatus: string | null
+  supplierAcceptedAtUtc: string | null
+  supplierRejectionReason: string | null
 }
