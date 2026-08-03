@@ -237,7 +237,7 @@ namespace InventoryReorderPlatform.Api.Controllers
                     QuantityAtTrigger = inventoryItem.QuantityOnHand,
                     RequestedQuantity = inventoryItem.ReorderQuantity,
                     TriggeredAt = DateTime.UtcNow,
-                    Status = "Pending"
+                    Status = ReorderEventStatuses.Pending
                 };
 
                 await _dbContext.ReorderEvents.AddAsync(newReorderEvent);
