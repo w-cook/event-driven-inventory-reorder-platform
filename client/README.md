@@ -9,15 +9,16 @@ The client provides an authenticated, role-aware operations interface organized 
 - application login and logout with in-memory JWT bearer authentication
 - persistent signed-in user and role visibility
 - semantic navigation with active-view indication and keyboard-accessible native controls
-- Dashboard view with inventory and workflow summary metrics beside system health
+- Dashboard view with inventory and current pending, supplier-accepted, and supplier-rejected workflow summary metrics beside system health
 - Inventory view with current stock, thresholds, configured reorder quantities, low-stock filtering, and backend-derived status
 - Operator and Administrator inventory creation and editing
-- Workflow view with quantity-at-trigger and requested-quantity snapshots
+- Workflow view with quantity-at-trigger and requested-quantity snapshots, supplier status, confirmation details, rejection reasons, and in-place refresh
 - Administrator-only Audit view with formatted, expandable details
 - Administrator-only Administration view with account creation, role changes, and activation controls
 - independent loading, empty, success, and error states
 - compact wide-screen presentation with responsive stacking and contained wide tables
 - automatic inventory, workflow, summary, and health refresh after successful mutations
+- manual Workflow History refresh without a full page reload or lost in-memory session
 
 The API remains the authoritative security and business-rule boundary. Frontend role checks improve usability by hiding unavailable views and actions, while protected endpoints independently enforce the same authorization requirements.
 
@@ -84,7 +85,7 @@ The authenticated application uses one persistent shell rather than separate bro
 | --- | --- | --- |
 | `Dashboard` | Inventory and workflow summary metrics plus System Health | Viewer, Operator, Administrator |
 | `Inventory` | Stock review, low-stock filtering, and inventory create/edit controls | Read for all roles; mutations for Operator and Administrator |
-| `Workflow` | Reorder-event and requested-quantity history | Viewer, Operator, Administrator |
+| `Workflow` | Reorder-event quantity history, supplier outcomes, confirmation details, rejection reasons, and refresh | Viewer, Operator, Administrator |
 | `Audit` | Successful inventory and account-management actions | Administrator |
 | `Administration` | Account creation, role management, and activation controls | Administrator |
 
@@ -120,7 +121,7 @@ PATCH  /api/accounts/{id}/role
 PATCH  /api/accounts/{id}/status
 ```
 
-The API also exposes individual inventory lookup and infrastructure health endpoints for other consumers and operational tooling. See the repository-level README and API documentation for the broader surface.
+The reorder-event response includes current workflow status and optional `supplierOrderId`, `supplierOrderStatus`, `supplierAcceptedAtUtc`, and `supplierRejectionReason` fields. The API also exposes individual inventory lookup and infrastructure health endpoints for other consumers and operational tooling. See the repository-level README and API documentation for the broader surface.
 
 ## Install Dependencies
 
@@ -275,6 +276,8 @@ Important client responsibilities include:
 - `src/components/AppNavigation.tsx` renders the role-aware application navigation and active-view state
 - `src/components/LoginForm.tsx` handles unauthenticated login state
 - `src/components/InventoryItemForm.tsx` handles inventory creation and editing
+- `src/components/WorkflowSummaryCards.tsx` counts pending, supplier-accepted, and supplier-rejected events
+- `src/components/ReorderWorkflowPanel.tsx` displays supplier outcomes and exposes the Workflow History refresh action
 - `src/components/AuditRecordsPanel.tsx` displays successful inventory and account-management actions
 - `src/components/AccountManagementPanel.tsx` lists accounts and exposes role and activation controls
 - `src/components/CreateAccountForm.tsx` handles Administrator account creation
@@ -287,7 +290,11 @@ After authentication, the client loads inventory items and reorder events, then 
 
 After a successful inventory creation or update, the client reloads inventory items and reorder events so Dashboard metrics, low-stock visibility, Workflow history, and the edited item reflect authoritative backend state. It also refreshes System Health independently.
 
-Inventory status remains calculated by the backend. The low-stock filter operates on inventory data already returned by the API.
+The Workflow History card can reload inventory and reorder-event data on demand. The refresh button is disabled while the request is active, reports errors inside the card, and does not reload the browser page or clear the in-memory JWT session.
+
+Workflow summaries count current `Pending`, `SupplierAccepted`, and `SupplierRejected` events. Legacy `Processed` events may still appear in history for compatibility but are not presented as a current supplier-outcome summary category.
+
+Inventory status remains calculated by the backend. Supplier acceptance does not change `QuantityOnHand`; physical stock changes only through a later inventory update.
 
 Audit and account data load only for an authenticated Administrator. Viewer and Operator sessions do not render those views or call their protected endpoints.
 
@@ -318,8 +325,8 @@ The client intentionally does not provide:
 - persistent browser sessions or refresh tokens
 - URL-addressable or deep-linkable application views
 - dead-letter replay controls
-- supplier-submission status, confirmation details, or purchasing controls
-- automatic stock receipt
+- supplier-order creation controls independent of the reorder workflow
+- shipment, delivery, purchasing, or automatic stock-receipt controls
 - password reset, password change, or email-verification workflows
 - production enterprise identity-provider integration
 

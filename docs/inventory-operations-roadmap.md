@@ -8,7 +8,7 @@ The work preserves the original event-driven architecture while adding operator 
 
 ## Current Status
 
-Phases 1–10 are complete. Phase 11 covers Processor-to-supplier submission, expanded workflow status, observability, and frontend visibility.
+Phases 1–11 are complete. Phase 12 covers complete endpoint documentation, generated OpenAPI review, and final verification.
 
 ## Phase Completion Standard
 
@@ -151,26 +151,28 @@ The final step of each phase must:
 
 ### Phase 11 — Supplier Submission Workflow and Visibility
 
-- [ ] add an `ISupplierOrderClient` abstraction to the Processor
-- [ ] implement supplier submission through a typed `HttpClient`
-- [ ] configure Aspire service discovery for the supplier client
-- [ ] configure the supplier base URL for Docker/local mode
-- [ ] propagate correlation identifiers and distributed trace context to the supplier
-- [ ] submit the stable Service Bus message ID as the supplier idempotency key
-- [ ] submit the supplier order before marking the reorder event processed
-- [ ] persist the supplier order identifier and acceptance details
-- [ ] keep retryable supplier failures eligible for Service Bus redelivery
-- [ ] distinguish retryable failures from permanent supplier rejection
-- [ ] add clear terminal reorder states for accepted and rejected requests
-- [ ] update reorder-event API responses with supplier-submission information
-- [ ] display supplier status and confirmation details in the Workflow view
-- [ ] test successful supplier submission
-- [ ] test delayed supplier responses
-- [ ] test transient supplier failure followed by successful recovery
-- [ ] test that message redelivery cannot create duplicate supplier orders
-- [ ] test permanent supplier rejection
-- [ ] verify traces across API, queue, Processor, and supplier boundaries
-- [ ] update all affected documentation and refresh screenshots where the frontend changed
+- [x] add an `ISupplierOrderClient` abstraction to the Processor
+- [x] implement supplier submission through a typed `HttpClient`
+- [x] configure Aspire service discovery for the supplier client
+- [x] configure the supplier base URL for Docker/local mode
+- [x] propagate correlation identifiers and distributed trace context to the supplier
+- [x] submit the stable Service Bus message ID as the supplier idempotency key
+- [x] submit the supplier order before recording a terminal reorder outcome
+- [x] persist the supplier order identifier and acceptance details
+- [x] keep retryable supplier failures eligible for Service Bus redelivery
+- [x] distinguish retryable failures from permanent supplier rejection
+- [x] add clear terminal reorder states for accepted and rejected requests
+- [x] update reorder-event API responses with supplier-submission information
+- [x] display supplier status and confirmation details in the Workflow view
+- [x] add in-place Workflow History refresh without clearing the login session
+- [x] update workflow summary counts for pending, supplier-accepted, and supplier-rejected events
+- [x] test successful supplier submission
+- [x] test delayed supplier responses
+- [x] test transient supplier failure followed by successful recovery
+- [x] test that message redelivery cannot create duplicate supplier orders
+- [x] test permanent supplier rejection
+- [x] verify traces across API, queue, Processor, and supplier boundaries
+- [x] update all affected documentation and refresh screenshots where the frontend changed
 
 ### Phase 12 — Complete API Documentation and Final Verification
 

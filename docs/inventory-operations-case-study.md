@@ -25,7 +25,7 @@ The React/TypeScript dashboard turns the protected backend into a usable interna
 - dedicated Administrator audit and account-management views
 - readable validation, authorization, and invalidated-session handling
 
-Inventory status calculation, reorder-event creation, account validation, authorization, and audit persistence remain backend responsibilities. Viewer sessions are read-only; successful Operator or Administrator mutations reload inventory, workflow, summary, and health data from the API rather than treating optimistic client state as authoritative.
+Inventory status calculation, reorder-event creation, account validation, authorization, and audit persistence remain backend responsibilities. Viewer sessions are read-only; successful Operator or Administrator mutations reload inventory, workflow, summary, and health data from the API rather than treating optimistic client state as authoritative. Workflow History can also refresh its current supplier outcomes without reloading the browser page and losing the in-memory session.
 
 ### Frontend Information Architecture and UX Polish
 
@@ -125,19 +125,19 @@ The Administrator frontend provides a dedicated audit-record panel with independ
 
 The Processor uses stable Service Bus message identifiers derived from reorder-event ids.
 
-Successful messages are recorded in a SQL-backed `ProcessedMessages` ledger. Before performing business processing, the Processor checks whether the same message id and message type have already been handled. Duplicate deliveries are completed without repeating the business operation.
+Successful terminal outcomes are recorded in a SQL-backed `ProcessedMessages` ledger. Before performing business processing, the Processor checks whether the same message id and message type have already been handled. Duplicate deliveries are completed without repeating the supplier submission or local business result.
 
 A unique database index provides additional protection against concurrent duplicate processing.
 
-Valid messages that fail business processing create `FailedMessages` records containing the failure reason, original payload when available, delivery attempt count, and UTC failure time.
+The Processor now submits each valid pending reorder to the mock supplier through a typed `HttpClient`. It sends the stable Service Bus message id as the supplier `Idempotency-Key` and propagates the workflow correlation identifier through `X-Correlation-Id`.
 
-Retryable failures are abandoned until the configured maximum delivery count is reached. Messages that continue failing are then moved to the dead-letter queue. Malformed or unsupported payloads are dead-lettered immediately because retrying them cannot make them valid.
+Supplier acceptance changes the event to `SupplierAccepted` and stores the external order identifier, status, and acceptance time. Permanent rejection changes the event to `SupplierRejected`, stores the rejection reason, and completes the message as a handled business outcome.
 
-This design accepts at-least-once queue delivery and makes duplicate delivery harmless through idempotent processing rather than claiming exactly-once delivery.
+Valid technical failures create `FailedMessages` records containing the failure reason, original payload when available, delivery attempt count, and UTC failure time. Retryable supplier, database, and HTTP failures leave the event `Pending` and are abandoned until the configured delivery limit is reached. Repeatedly failing technical messages are then moved to the dead-letter queue. Malformed or unsupported payloads are dead-lettered immediately.
 
-The solution now includes an independently hosted mock supplier API that provides the external HTTP boundary previously missing from the workflow. It accepts durable idempotency keys, persists accepted orders independently, and simulates delayed responses, transient failures, and permanent rejection.
+The supplier and inventory databases cannot share a transaction. Idempotent replay addresses the resulting ambiguity: if the supplier accepts the order but the Processor fails to save locally, redelivery sends the same key, receives the original accepted order, and completes local persistence without creating a second supplier order.
 
-During Phase 10, the supplier is verified independently. The Processor still completes the internal reorder workflow without calling it. Phase 11 will pass the stable Service Bus message id to the supplier as the idempotency key and require supplier acceptance before the reorder reaches its successful terminal state.
+This design accepts at-least-once queue delivery and applies idempotency at the queue ledger and external HTTP boundary rather than claiming exactly-once execution.
 
 ### Mock Supplier Boundary
 
@@ -157,7 +157,7 @@ It does not reference the inventory API, the inventory data project, the Process
 
 New requests require an explicit idempotency key. A valid submission is persisted and returns `201 Created`. An identical replay returns the original accepted order with `200 OK`, while reuse of the key with a different business payload returns `409 Conflict`.
 
-The design uses both an application-level lookup and a unique SQL index. This matters for ambiguous outcomes: a caller may send a valid request, lose the response, and retry without knowing whether the supplier committed the order. Reusing the same stable key makes that retry safe and prevents a second purchasing result.
+The design uses both an application-level lookup and a unique SQL index. This matters for ambiguous outcomes: the Processor may send a valid request, lose the response, or fail its local save without knowing whether the supplier committed the order. Reusing the same stable key makes every retry safe and prevents a second purchasing result.
 
 The supplier service can be configured for:
 
@@ -166,27 +166,36 @@ The supplier service can be configured for:
 - a fixed number of transient `503 Service Unavailable` responses before recovery
 - permanent `422 Unprocessable Entity` rejection
 
+The Processor interprets `201` and identical `200` responses as acceptance, `422` as a terminal rejection, and transient or unexpected responses as technical failures eligible for Service Bus redelivery.
+
 Transient failures and permanent rejections do not create accepted-order records. Existing accepted orders are checked before failure simulation, so a later retry continues to return the durable original result even when the configured mock mode has changed.
 
 Transient-attempt counters are intentionally held in process memory because they exist only to simulate local dependency behavior. Accepted orders remain durable in the supplier database and survive service restarts.
 
 Aspire and Docker may host the supplier database on the same local SQL Server resource as the inventory database, but separate connection strings, contexts, migrations, tables, and constraints preserve service ownership.
 
-Phase 10 verifies this boundary directly. Phase 11 will connect the Processor through a typed HTTP client, pass the stable Service Bus message id as the supplier idempotency key, propagate correlation and trace context, and expose supplier outcomes through the reorder workflow.
-
 ### Observability
 
 The inventory API, Processor, and mock supplier API use shared Aspire service defaults for structured OpenTelemetry logging, metrics, ASP.NET Core tracing, HTTP client tracing, and local OTLP export.
 
-Each API request accepts or generates an `X-Correlation-Id`. The identifier is returned to the caller and propagated through the Service Bus message so API and Processor lifecycle logs can be searched using the same value. This correlation identifier is diagnostic and remains separate from the stable Service Bus message id used for idempotency.
+Each API request accepts or generates an `X-Correlation-Id`. The identifier is returned to the caller, propagated through the Service Bus message, and sent by the Processor to the supplier. Important API, Processor, typed-client, and supplier-service logs include that value directly in their structured message templates, so one plain-text search follows the workflow across process boundaries.
 
-The platform also propagates W3C trace context through Service Bus application properties. Custom `PublishReorderMessage` and `ProcessReorderMessage` activities represent the application-owned producer and consumer boundaries. Their attributes describe the queue, message, inventory item, reorder event, delivery attempt, processing outcome, and settlement result.
+The correlation identifier remains separate from the stable Service Bus message id used for idempotency.
+
+The platform also propagates W3C trace context through Service Bus application properties. Custom `PublishReorderMessage` and `ProcessReorderMessage` activities represent the application-owned producer and consumer boundaries. The instrumented outgoing supplier request appears below the consumer activity:
+
+```text
+Inventory API
+└── PublishReorderMessage
+    └── ProcessReorderMessage
+        └── POST /api/supplier-orders
+```
+
+Relevant attributes describe the queue, message, inventory item, reorder event, delivery attempt, processing outcome, settlement result, and correlation id.
 
 Authentication requests and authorization outcomes use normal HTTP telemetry. Sensitive passwords, signing keys, password hashes, and raw access tokens are intentionally excluded from logs and trace attributes.
 
 This approach extends the project’s existing Aspire infrastructure instead of adding a separate telemetry stack. It provides locally reproducible distributed diagnostics without claiming production log retention, cloud monitoring, or alerting services.
-
-During Phase 10, correlation and W3C trace propagation connect the inventory API, queue, and Processor. Direct requests to the mock supplier generate their own service telemetry, but they are not yet children of the reorder workflow trace. The API-to-queue-to-Processor-to-supplier trace will be completed in Phase 11.
 
 Operational verification steps are kept separately in `docs/observability-runbook.md`.
 
@@ -206,7 +215,7 @@ The current xUnit v3 tests verify that:
 - duplicate account emails, unsupported roles, and weak passwords are rejected
 - the final active Administrator cannot be demoted or deactivated
 - inventory and account-management actions create audit records
-- successful Processor handling updates the reorder event and records the processed message
+- successful supplier submission updates the event to `SupplierAccepted` and records the processed message
 - duplicate delivery does not create a duplicate business result
 - failed processing creates a persisted failure record with payload and attempt information
 - correlation middleware generates an identifier when one is absent and preserves a caller-supplied identifier when one is provided
@@ -221,6 +230,12 @@ The current xUnit v3 tests verify that:
 - delayed supplier responses
 - transient supplier failure followed by successful recovery
 - permanent supplier rejection without accepted-order persistence
+- typed supplier-client request headers and response validation
+- delayed supplier-client completion
+- transient supplier failure followed by successful Processor redelivery
+- permanent rejection persisted as a terminal reorder outcome
+- local-save failure after supplier acceptance followed by idempotent recovery
+- one unique supplier order across repeated delivery
 - replay of an accepted order after the configured mock behavior changes
 
 Direct Worker settlement tests are not currently included because the Worker depends on concrete Azure Service Bus transport types. Adding a separate transport abstraction solely for those tests would add more complexity than the current scope requires.
@@ -234,18 +249,22 @@ The structured API request file supports a repeatable Aspire-oriented workflow t
 1. logs in as the configured bootstrap Administrator
 2. creates Viewer and Operator test accounts
 3. reuses named-response access tokens for role-specific requests
-4. verifies authorization, reorder quantities, immutable snapshots, inventory changes, audit records, processing, and health behavior
+4. verifies authorization, reorder quantities, immutable snapshots, inventory changes, audit records, processing, supplier outcomes, and health behavior
 
-The browser-based role matrix was repeated after the frontend information-architecture work:
+The browser-based role matrix was repeated after the frontend information-architecture and supplier-visibility work:
 
 - Viewer sessions remained read-only
 - Operator sessions received inventory mutation controls but no audit or account-management panels
 - Administrator sessions received all privileged panels
 - role or activation changes invalidated existing sessions and returned affected users to login on their next protected request
+- Workflow History refreshed current pending, accepted, and rejected supplier outcomes without reloading the page
+- summary cards counted current pending, supplier-accepted, and supplier-rejected events
 
 Credential values are resolved through ASP.NET Core User Secrets and are not stored in the repository.
 
-The mock supplier is also verified directly through its HTTP endpoint in Aspire and Docker modes. Manual checks confirm new acceptance, identical replay, conflicting replay, health, liveness, OpenAPI availability, and persistence of an accepted supplier order across a supplier-container restart. These checks remain separate from the inventory workflow until Phase 11.
+The complete supplier workflow was verified in Aspire using normal acceptance, delayed acceptance, transient failure followed by recovery, and permanent rejection. Correlated logs and traces were inspected across the API, queue, Processor, typed client, and supplier service.
+
+The normal accepted workflow was also verified through the Docker/local stack. Manual checks confirmed the persisted supplier order details, unchanged physical stock, resource health, and the same correlation identifier across API, Processor, and supplier logs.
 
 ## Tradeoffs and Boundaries
 
@@ -261,9 +280,11 @@ It does not claim:
 - password-reset or email-verification delivery
 - production cloud key management
 
-These boundaries keep the implementation focused and defensible while leaving clear extension points for a production environment.
+The mock supplier integration demonstrates external-service contract ownership, typed HTTP communication, durable idempotency, configurable dependency failure, separate persistence, retry through queue redelivery, and end-to-end correlation without claiming a real commercial supplier or completed purchasing workflow.
 
-The mock supplier boundary demonstrates external-service contract ownership, durable idempotency, configurable dependency failure, and separate persistence without claiming a real commercial supplier or completed purchasing workflow. During Phase 10, it is not authenticated as a production service and is not called by the Processor. Those integration responsibilities remain explicit Phase 11 work.
+The supplier and inventory databases intentionally do not share a distributed transaction. The design relies on stable idempotency and replay to recover from external acceptance followed by local persistence failure.
+
+The implementation does not include service-to-service supplier authentication, shipment tracking, automatic stock receipt, durable mock transient counters, automated dead-letter replay, or production hosting. These boundaries keep the work focused and defensible while leaving clear extension points for a production environment.
 
 ## Portfolio Value
 
@@ -277,7 +298,10 @@ This expansion demonstrates practical engineering concerns that transfer across 
 - distributed workflow reliability and idempotent message processing
 - duplicate-delivery protection, retry, and dead-letter behavior
 - independently hosted external-service contract design
+- typed Processor-to-supplier HTTP integration
 - durable supplier-order idempotency and ambiguous-response replay safety
+- recovery from supplier acceptance followed by local persistence failure
+- visible supplier acceptance and rejection outcomes
 - separate supplier persistence and migration ownership
 - configurable delayed, transient-failure, and permanent-rejection behavior
 - operational diagnostics and production-oriented automated testing

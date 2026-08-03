@@ -6,7 +6,7 @@
 
 The service exists to provide a realistic HTTP dependency for the inventory reorder workflow without requiring a paid service, cloud account, or real purchasing integration.
 
-Phase 10 establishes and verifies the supplier boundary itself. The background Processor does not call this service yet. Processor integration, supplier-submission status, and frontend visibility are part of Phase 11.
+The background Processor submits reorder requests to this service after consuming the corresponding Service Bus message. The supplier boundary remains independently owned even though it participates in the complete reorder workflow.
 
 ## Responsibilities
 
@@ -14,6 +14,7 @@ The mock supplier service:
 
 * accepts supplier-order requests over HTTP
 * validates the supplier request and required idempotency header
+* accepts and logs the propagated workflow correlation identifier
 * persists accepted orders in its own SQL Server database
 * makes repeated delivery of the same request harmless
 * detects conflicting reuse of an idempotency key
@@ -33,9 +34,12 @@ POST /api/supplier-orders
 
 ```http
 Idempotency-Key: reorder-event-<reorder-event-id>
+X-Correlation-Id: <workflow-correlation-id>
 ```
 
 The request must contain exactly one nonempty `Idempotency-Key` value no longer than 200 characters.
+
+The Processor supplies `X-Correlation-Id` so the submission can be followed through API, queue, Processor, typed-client, and supplier logs. Direct development requests that omit the header use the supplier request’s local trace identifier for logging.
 
 ### Request Body
 
@@ -74,6 +78,36 @@ The SKU is required and limited to 50 characters. `requestedQuantity` must be po
   "acceptedAtUtc": "2026-08-02T13:31:00Z"
 }
 ```
+
+## Processor Integration
+
+The Processor constructs the supplier request from the immutable `ReorderRequestedMessage` snapshot rather than rereading mutable inventory configuration.
+
+It submits:
+
+- reorder-event identifier
+- inventory-item identifier
+- SKU
+- requested quantity
+- UTC trigger time
+
+The Service Bus message identifier is used as the supplier `Idempotency-Key`. For normal application workflows it follows this format:
+
+```text
+reorder-event-<ReorderEventId>
+```
+
+The Processor interprets supplier responses as follows:
+
+| Supplier response | Processor behavior |
+| --- | --- |
+| `201 Created` | Persist supplier acceptance and complete the message |
+| `200 OK` | Persist the replayed original acceptance and complete the message |
+| `422 Unprocessable Entity` | Persist terminal supplier rejection and complete the message |
+| `503 Service Unavailable` | Record a failed attempt and abandon for redelivery |
+| Other unexpected response | Treat as a technical failure eligible for retry and dead-letter handling |
+
+The HTTP resilience configuration does not internally retry unsafe `POST` operations. Service Bus abandonment and redelivery own supplier-submission retries so each attempt remains visible in processing and failure records.
 
 ## Idempotency Behavior
 
@@ -169,6 +203,8 @@ The service waits for `DelayMilliseconds` before processing the request.
 
 The configured delay must be between 0 and 30,000 milliseconds.
 
+The shared HTTP resilience pipeline has a shorter per-attempt timeout than the mock service’s maximum configurable delay. A moderate delay such as five seconds demonstrates slow but successful processing. A delay beyond the HTTP attempt timeout is canceled and treated as a retryable technical failure.
+
 ### TransientFailure
 
 The service returns `503 Service Unavailable` for the configured number of attempts associated with an idempotency key. A later attempt proceeds normally.
@@ -237,11 +273,11 @@ The generated OpenAPI document should be inspected before it is treated as compl
 
 The supplier service and supplier database are orchestrated by `InventoryReorderPlatform.AppHost`.
 
-Aspire provides dynamically assigned service endpoints together with resource health, logs, metrics, and traces.
+Aspire provides dynamically assigned service endpoints together with service discovery, resource health, logs, metrics, and traces. The Processor resolves the supplier through the Aspire resource name `supplier`.
 
 ### Docker Compose
 
-The supplier service is exposed at:
+The supplier service is exposed to the host at:
 
 ```text
 http://localhost:8082
@@ -254,6 +290,8 @@ GET http://localhost:8082/health
 GET http://localhost:8082/alive
 GET http://localhost:8082/openapi/v1.json
 ```
+
+The Processor reaches the supplier inside the Compose network at `http://supplier:8080`.
 
 The complete local backend stack can be started with:
 
@@ -277,7 +315,18 @@ docker compose -f docker-compose.local.yml up -d --build
 * permanent rejection
 * replay of an accepted order after the mock mode changes
 
-The SQLite integration-test database uses a relational unique constraint so tests exercise behavior that EF Core’s non-relational InMemory provider would not enforce.
+`InventoryReorderPlatform.Processor.Tests` additionally verifies:
+
+* accepted `201 Created` and replayed `200 OK` responses
+* required idempotency and correlation headers
+* delayed client completion
+* supplier response validation
+* transient failure followed by successful redelivery
+* permanent rejection persistence
+* supplier acceptance followed by an initial local-save failure
+* redelivery completing the local transaction without creating a second supplier order
+
+The SQLite supplier integration-test database uses a relational unique constraint so tests exercise behavior that EF Core’s non-relational InMemory provider would not enforce.
 
 ## Intentional Limitations
 
@@ -292,6 +341,6 @@ It currently does not provide:
 * automatic updates to `QuantityOnHand`
 * production hosting
 * durable transient-attempt counters
-* Processor-to-supplier submission
 
 A supplier order being accepted remains distinct from stock being physically received. Inventory stock changes only through a later inventory update.
+
