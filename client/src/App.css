@@ -592,18 +592,21 @@ button:disabled {
    ========================================================================== */
 
 .audit-records,
-.account-management {
+.account-management,
+.reorder-workflow {
   margin-top: 0;
 }
 
 .audit-records .section-header,
-.account-management .section-header {
+.account-management .section-header,
+.reorder-workflow .section-header {
   display: block;
   text-align: center;
 }
 
 .audit-records .section-header h3,
-.account-management .section-header h3 {
+.account-management .section-header h3,
+.reorder-workflow .section-header h2 {
   margin: 0 0 0.25rem;
 }
 
@@ -614,7 +617,8 @@ button:disabled {
   text-align: center;
 }
 
-.audit-records .section-header button {
+.audit-records .section-header button,
+.reorder-workflow .section-header button {
   margin-top: 0.4rem;
 }
 

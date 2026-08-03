@@ -4,6 +4,9 @@ import type { ReorderEvent } from '../types/reorderEvent'
 interface Props {
   events: ReorderEvent[]
   inventoryItems: InventoryItem[]
+  isRefreshing: boolean
+  refreshErrorMessage: string
+  onRefresh: () => void
 }
 
 function statusClass(status: string): string {
@@ -116,81 +119,123 @@ function SupplierResult({ event }: { event: ReorderEvent }) {
 export function ReorderWorkflowPanel({
   events,
   inventoryItems,
+  isRefreshing,
+  refreshErrorMessage,
+  onRefresh,
 }: Props) {
   const itemsById = new Map(
     inventoryItems.map((item) => [item.id, item]),
   )
 
-  if (events.length === 0) {
-    return (
-      <section className="card">
-        <h2>Workflow History</h2>
-        <p>No reorder workflow events found.</p>
-      </section>
-    )
-  }
-
   return (
-    <section className="card">
-      <h2>Workflow History</h2>
+    <section className="card reorder-workflow">
+      <div className="section-header">
+        <div>
+          <h2>Workflow History</h2>
+        </div>
+
+        <button
+          type="button"
+          className="secondary-button"
+          disabled={isRefreshing}
+          onClick={onRefresh}
+        >
+          {isRefreshing
+            ? 'Refreshing...'
+            : 'Refresh workflow'}
+        </button>
+      </div>
 
       <p className="muted">
-        Requested quantity is captured when the reorder workflow begins.
-        Supplier Accepted means the external supplier accepted the order;
-        it does not mean replacement stock has been received.
+        Requested quantity is captured when the reorder
+        workflow begins. Supplier Accepted means the
+        external supplier accepted the order; it does not
+        mean replacement stock has been received.
       </p>
 
-      <div className="table-wrapper">
-        <table className="workflow-table">
-          <thead>
-            <tr>
-              <th>Item</th>
-              <th>SKU</th>
-              <th>Status</th>
-              <th>Quantity at Trigger</th>
-              <th>Requested Quantity</th>
-              <th>Supplier Result</th>
-              <th>Triggered</th>
-            </tr>
-          </thead>
+      {refreshErrorMessage && (
+        <p className="error" role="alert">
+          {refreshErrorMessage}
+        </p>
+      )}
 
-          <tbody>
-            {events.map((event) => {
-              const item =
-                itemsById.get(event.inventoryItemId)
+      {isRefreshing && (
+        <p className="loading-message">
+          Refreshing workflow history...
+        </p>
+      )}
 
-              return (
-                <tr key={event.id}>
-                  <td>
-                    {item?.name ??
-                      `Item ${event.inventoryItemId}`}
-                  </td>
+      {!isRefreshing &&
+        !refreshErrorMessage &&
+        events.length === 0 && (
+          <p>No reorder workflow events found.</p>
+        )}
 
-                  <td>{item?.sku ?? '—'}</td>
-
-                  <td className="workflow-status-cell">
-                    <span
-                      className={statusClass(event.status)}
-                    >
-                      {formatStatus(event.status)}
-                    </span>
-                  </td>
-
-                  <td>{event.quantityAtTrigger}</td>
-
-                  <td>{event.requestedQuantity}</td>
-
-                  <td>
-                    <SupplierResult event={event} />
-                  </td>
-
-                  <td>{formatDate(event.triggeredAt)}</td>
+      {!isRefreshing &&
+        !refreshErrorMessage &&
+        events.length > 0 && (
+          <div className="table-wrapper">
+            <table className="workflow-table">
+              <thead>
+                <tr>
+                  <th>Item</th>
+                  <th>SKU</th>
+                  <th>Status</th>
+                  <th>Quantity at Trigger</th>
+                  <th>Requested Quantity</th>
+                  <th>Supplier Result</th>
+                  <th>Triggered</th>
                 </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      </div>
+              </thead>
+
+              <tbody>
+                {events.map((event) => {
+                  const item =
+                    itemsById.get(
+                      event.inventoryItemId,
+                    )
+
+                  return (
+                    <tr key={event.id}>
+                      <td>
+                        {item?.name ??
+                          `Item ${event.inventoryItemId}`}
+                      </td>
+
+                      <td>{item?.sku ?? '—'}</td>
+
+                      <td className="workflow-status-cell">
+                        <span
+                          className={statusClass(
+                            event.status,
+                          )}
+                        >
+                          {formatStatus(event.status)}
+                        </span>
+                      </td>
+
+                      <td>
+                        {event.quantityAtTrigger}
+                      </td>
+
+                      <td>
+                        {event.requestedQuantity}
+                      </td>
+
+                      <td>
+                        <SupplierResult event={event} />
+                      </td>
+
+                      <td>
+                        {formatDate(event.triggeredAt)}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
     </section>
   )
 }
