@@ -140,8 +140,10 @@ public class Worker : BackgroundService
         {
             _logger.LogWarning(
                 ex,
-                "Message {MessageId} contained invalid JSON.",
-                message.MessageId);
+                "Message {MessageId} with CorrelationId " +
+                "{CorrelationId} contained invalid JSON.",
+                message.MessageId,
+                correlationId);
 
             activity?.SetTag(
                 "reorder.outcome",
@@ -168,9 +170,11 @@ public class Worker : BackgroundService
         if (reorderMessage == null)
         {
             _logger.LogWarning(
-                "Message {MessageId} did not contain a valid " +
+                "Message {MessageId} with CorrelationId " +
+                "{CorrelationId} did not contain a valid " +
                 "reorder request.",
-                message.MessageId);
+                message.MessageId,
+                correlationId);
 
             activity?.SetTag(
                 "reorder.outcome",

@@ -57,6 +57,16 @@ public sealed class SupplierOrdersController : ControllerBase
             return ValidationProblem(ModelState);
         }
 
+        var correlationId = ResolveCorrelationId();
+
+        using var loggingScope =
+            _logger.BeginScope(
+                new Dictionary<string, object>
+                {
+                    ["CorrelationId"] = correlationId,
+                    ["IdempotencyKey"] = idempotencyKey
+                });
+
         if (string.IsNullOrWhiteSpace(request.Sku))
         {
             ModelState.AddModelError(
@@ -97,7 +107,8 @@ public sealed class SupplierOrdersController : ControllerBase
             return BuildExistingOrderResult(
                 existingOrder,
                 request,
-                normalizedSku);
+                normalizedSku,
+                correlationId);
         }
 
         var behaviorResult =
@@ -115,9 +126,11 @@ public sealed class SupplierOrdersController : ControllerBase
             _logger.LogWarning(
                 "Simulated transient supplier failure for " +
                 "idempotency key {IdempotencyKey} on attempt " +
-                "{AttemptNumber}.",
+                "{AttemptNumber} with CorrelationId " +
+                "{CorrelationId}.",
                 idempotencyKey,
-                behaviorResult.AttemptNumber);
+                behaviorResult.AttemptNumber,
+                correlationId);
 
             return StatusCode(
                 StatusCodes.Status503ServiceUnavailable,
@@ -135,8 +148,10 @@ public sealed class SupplierOrdersController : ControllerBase
         {
             _logger.LogWarning(
                 "Simulated permanent supplier rejection for " +
-                "idempotency key {IdempotencyKey}.",
-                idempotencyKey);
+                "idempotency key {IdempotencyKey} with " +
+                "CorrelationId {CorrelationId}.",
+                idempotencyKey,
+                correlationId);
 
             return UnprocessableEntity(
                 new ProblemDetails
@@ -173,8 +188,11 @@ public sealed class SupplierOrdersController : ControllerBase
             // after our initial lookup but before our insert completed.
             _logger.LogWarning(
                 exception,
-                "A concurrent supplier-order insert occurred for idempotency key {IdempotencyKey}.",
-                idempotencyKey);
+                "A concurrent supplier-order insert occurred " +
+                "for idempotency key {IdempotencyKey} with " +
+                "CorrelationId {CorrelationId}.",
+                idempotencyKey,
+                correlationId);
 
             _dbContext.ChangeTracker.Clear();
 
@@ -192,30 +210,41 @@ public sealed class SupplierOrdersController : ControllerBase
             return BuildExistingOrderResult(
                 existingOrder,
                 request,
-                normalizedSku);
+                normalizedSku,
+                correlationId);
         }
 
         _logger.LogInformation(
-            "Accepted supplier order {SupplierOrderId} for reorder event {ReorderEventId}.",
+            "Accepted supplier order {SupplierOrderId} for " +
+            "reorder event {ReorderEventId} with " +
+            "CorrelationId {CorrelationId}.",
             supplierOrder.Id,
-            supplierOrder.ReorderEventId);
+            supplierOrder.ReorderEventId,
+            correlationId);
 
         return StatusCode(
             StatusCodes.Status201Created,
             MapToResponse(supplierOrder));
     }
 
-    private ActionResult<SupplierOrderResponse>
-        BuildExistingOrderResult(
-            SupplierOrder existingOrder,
-            CreateSupplierOrderRequest request,
-            string normalizedSku)
+    private ActionResult<SupplierOrderResponse> BuildExistingOrderResult(
+        SupplierOrder existingOrder,
+        CreateSupplierOrderRequest request,
+        string normalizedSku,
+        string correlationId)
     {
         if (!PayloadMatches(
                 existingOrder,
                 request,
                 normalizedSku))
         {
+            _logger.LogWarning(
+                "Rejected conflicting supplier submission for " +
+                "idempotency key {IdempotencyKey} with " +
+                "CorrelationId {CorrelationId}.",
+                existingOrder.IdempotencyKey,
+                correlationId);
+
             return Conflict(new ProblemDetails
             {
                 Status = StatusCodes.Status409Conflict,
@@ -227,8 +256,11 @@ public sealed class SupplierOrdersController : ControllerBase
         }
 
         _logger.LogInformation(
-            "Returning existing supplier order {SupplierOrderId} for duplicate idempotency key.",
-            existingOrder.Id);
+            "Returning existing supplier order " +
+            "{SupplierOrderId} for duplicate idempotency " +
+            "key with CorrelationId {CorrelationId}.",
+            existingOrder.Id,
+            correlationId);
 
         return Ok(MapToResponse(existingOrder));
     }
@@ -268,5 +300,24 @@ public sealed class SupplierOrdersController : ControllerBase
             Status = supplierOrder.Status,
             AcceptedAtUtc = supplierOrder.AcceptedAtUtc
         };
+    }
+
+    private string ResolveCorrelationId()
+    {
+        if (Request.Headers.TryGetValue(
+                SupplierApiHeaders.CorrelationId,
+                out var correlationValues)
+            && correlationValues.Count == 1)
+        {
+            var correlationId =
+                correlationValues[0]?.Trim();
+
+            if (!string.IsNullOrWhiteSpace(correlationId))
+            {
+                return correlationId;
+            }
+        }
+
+        return HttpContext.TraceIdentifier;
     }
 }

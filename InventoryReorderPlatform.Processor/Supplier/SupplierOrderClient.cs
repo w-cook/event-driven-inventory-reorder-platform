@@ -84,10 +84,12 @@ public sealed class SupplierOrderClient
             _logger.LogInformation(
                 "Supplier accepted order {SupplierOrderId} for " +
                 "reorder event {ReorderEventId} with idempotency " +
-                "key {IdempotencyKey}.",
+                "key {IdempotencyKey} and CorrelationId " +
+                "{CorrelationId}.",
                 supplierOrder.SupplierOrderId,
                 supplierOrder.ReorderEventId,
-                idempotencyKey);
+                idempotencyKey,
+                correlationId);
 
             return SupplierOrderSubmissionResult.Accepted(
                 supplierOrder.SupplierOrderId,
@@ -105,8 +107,12 @@ public sealed class SupplierOrderClient
 
             _logger.LogWarning(
                 "Supplier permanently rejected reorder event " +
-                "{ReorderEventId}: {RejectionReason}",
+                "{ReorderEventId} with idempotency key " +
+                "{IdempotencyKey} and CorrelationId " +
+                "{CorrelationId}: {RejectionReason}",
                 request.ReorderEventId,
+                idempotencyKey,
+                correlationId,
                 rejectionReason);
 
             return SupplierOrderSubmissionResult.Rejected(
@@ -116,6 +122,16 @@ public sealed class SupplierOrderClient
         var responseBody =
             await response.Content.ReadAsStringAsync(
                 cancellationToken);
+
+        _logger.LogWarning(
+            "Supplier submission for reorder event " +
+            "{ReorderEventId} returned HTTP {StatusCode} " +
+            "with idempotency key {IdempotencyKey} and " +
+            "CorrelationId {CorrelationId}.",
+            request.ReorderEventId,
+            (int)response.StatusCode,
+            idempotencyKey,
+            correlationId);
 
         throw new HttpRequestException(
             $"Supplier submission returned HTTP " +

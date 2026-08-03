@@ -37,11 +37,28 @@ public sealed class ReorderMessageProcessor
         int deliveryCount,
         CancellationToken cancellationToken = default)
     {
+        var logCorrelationId =
+            string.IsNullOrWhiteSpace(correlationId)
+                ? "missing"
+                : correlationId;
+
+        using var loggingScope =
+            _logger.BeginScope(
+                new Dictionary<string, object>
+                {
+                    ["CorrelationId"] = logCorrelationId,
+                    ["MessageId"] =
+                        string.IsNullOrWhiteSpace(messageId)
+                            ? "missing-message-id"
+                            : messageId
+                });
+
         if (string.IsNullOrWhiteSpace(messageId))
         {
             return await RecordFailureAsync(
                 "The Service Bus message did not contain a message id.",
                 "missing-message-id",
+                logCorrelationId,
                 rawPayload,
                 deliveryCount,
                 cancellationToken);
@@ -53,6 +70,7 @@ public sealed class ReorderMessageProcessor
                 "The Service Bus message did not contain a valid " +
                 "correlation identifier.",
                 messageId,
+                logCorrelationId,
                 rawPayload,
                 deliveryCount,
                 cancellationToken);
@@ -70,8 +88,10 @@ public sealed class ReorderMessageProcessor
         if (alreadyProcessed)
         {
             _logger.LogInformation(
-                "Skipping duplicate reorder message {MessageId}.",
-                messageId);
+                "Skipping duplicate reorder message {MessageId} " +
+                "with CorrelationId {CorrelationId}.",
+                messageId,
+                logCorrelationId);
 
             return new ReorderProcessingResult(
                 ReorderProcessingOutcome.DuplicateSkipped);
@@ -92,6 +112,7 @@ public sealed class ReorderMessageProcessor
                     $"Reorder event {message.ReorderEventId} " +
                     "was not found.",
                     messageId,
+                    logCorrelationId,
                     rawPayload,
                     deliveryCount,
                     cancellationToken);
@@ -102,9 +123,11 @@ public sealed class ReorderMessageProcessor
             {
                 _logger.LogInformation(
                     "Reorder event {ReorderEventId} already has " +
-                    "terminal status {ReorderStatus}.",
+                    "terminal status {ReorderStatus} with " +
+                    "CorrelationId {CorrelationId}.",
                     reorderEvent.Id,
-                    reorderEvent.Status);
+                    reorderEvent.Status,
+                    logCorrelationId);
 
                 return new ReorderProcessingResult(
                     ReorderProcessingOutcome.DuplicateSkipped);
@@ -117,6 +140,7 @@ public sealed class ReorderMessageProcessor
                     $"Reorder event {reorderEvent.Id} has " +
                     $"unsupported status '{reorderEvent.Status}'.",
                     messageId,
+                    logCorrelationId,
                     rawPayload,
                     deliveryCount,
                     cancellationToken);
@@ -189,10 +213,12 @@ public sealed class ReorderMessageProcessor
             _logger.LogInformation(
                 "Handled reorder message {MessageId} for " +
                 "ReorderEventId {ReorderEventId} with terminal " +
-                "status {ReorderStatus}.",
+                "status {ReorderStatus} and CorrelationId " +
+                "{CorrelationId}.",
                 messageId,
                 reorderEvent.Id,
-                reorderEvent.Status);
+                reorderEvent.Status,
+                logCorrelationId);
 
             return new ReorderProcessingResult(
                 processingOutcome,
@@ -226,8 +252,10 @@ public sealed class ReorderMessageProcessor
                 _logger.LogInformation(
                     exception,
                     "Concurrent duplicate reorder message " +
-                    "{MessageId} was skipped.",
-                    messageId);
+                    "{MessageId} with CorrelationId " +
+                    "{CorrelationId} was skipped.",
+                    messageId,
+                    logCorrelationId);
 
                 return new ReorderProcessingResult(
                     ReorderProcessingOutcome
@@ -237,6 +265,7 @@ public sealed class ReorderMessageProcessor
             return await RecordFailureAsync(
                 exception.GetBaseException().Message,
                 messageId,
+                logCorrelationId,
                 rawPayload,
                 deliveryCount,
                 cancellationToken);
@@ -248,6 +277,7 @@ public sealed class ReorderMessageProcessor
             return await RecordFailureAsync(
                 exception.GetBaseException().Message,
                 messageId,
+                logCorrelationId,
                 rawPayload,
                 deliveryCount,
                 cancellationToken);
@@ -371,13 +401,13 @@ public sealed class ReorderMessageProcessor
         };
     }
 
-    private async Task<ReorderProcessingResult>
-        RecordFailureAsync(
-            string reason,
-            string messageId,
-            string? rawPayload,
-            int deliveryCount,
-            CancellationToken cancellationToken)
+    private async Task<ReorderProcessingResult> RecordFailureAsync(
+        string reason,
+        string messageId,
+        string correlationId,
+        string? rawPayload,
+        int deliveryCount,
+        CancellationToken cancellationToken)
     {
         // Do not save partially tracked supplier-state changes
         // alongside a retryable failure record.
@@ -398,9 +428,11 @@ public sealed class ReorderMessageProcessor
             cancellationToken);
 
         _logger.LogWarning(
-            "Reorder message {MessageId} failed on delivery " +
-            "attempt {DeliveryCount}: {Reason}",
+            "Reorder message {MessageId} with CorrelationId " +
+            "{CorrelationId} failed on delivery attempt " +
+            "{DeliveryCount}: {Reason}",
             messageId,
+            correlationId,
             deliveryCount,
             reason);
 
