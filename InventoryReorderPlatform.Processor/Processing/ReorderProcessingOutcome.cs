@@ -2,7 +2,8 @@
 
 public enum ReorderProcessingOutcome
 {
-    Processed,
+    SupplierAccepted,
+    SupplierRejected,
     DuplicateSkipped,
     Failed
 }

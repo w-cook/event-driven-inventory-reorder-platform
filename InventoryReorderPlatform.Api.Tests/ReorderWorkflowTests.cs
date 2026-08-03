@@ -1,5 +1,4 @@
 ﻿extern alias processor;
-
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -7,13 +6,20 @@ using InventoryReorderPlatform.Api.DTOs;
 using InventoryReorderPlatform.Api.Security;
 using InventoryReorderPlatform.Api.Services;
 using InventoryReorderPlatform.Data;
+using InventoryReorderPlatform.Data.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
+using ISupplierOrderClient =
+    processor::InventoryReorderPlatform.Processor.Supplier.ISupplierOrderClient;
 using ReorderMessageProcessor =
     processor::InventoryReorderPlatform.Processor.Processing.ReorderMessageProcessor;
 using ReorderProcessingOutcome =
     processor::InventoryReorderPlatform.Processor.Processing.ReorderProcessingOutcome;
+using SupplierOrderRequest =
+    processor::InventoryReorderPlatform.Processor.Supplier.SupplierOrderRequest;
+using SupplierOrderSubmissionResult =
+    processor::InventoryReorderPlatform.Processor.Supplier.SupplierOrderSubmissionResult;
 
 namespace InventoryReorderPlatform.Api.Tests;
 
@@ -228,8 +234,12 @@ public sealed class ReorderWorkflowTests
             scope.ServiceProvider
                 .GetRequiredService<AppDbContext>();
 
+        var supplierClient =
+            new AcceptingSupplierOrderClient();
+
         var processor = new ReorderMessageProcessor(
             dbContext,
+            supplierClient,
             NullLogger<ReorderMessageProcessor>.Instance);
 
         var messageId =
@@ -242,12 +252,13 @@ public sealed class ReorderWorkflowTests
             await processor.ProcessAsync(
                 publishedMessage,
                 messageId,
+                "api-workflow-test-correlation",
                 rawPayload,
                 deliveryCount: 1,
                 cancellationToken);
 
         Assert.Equal(
-            ReorderProcessingOutcome.Processed,
+            ReorderProcessingOutcome.SupplierAccepted,
             processingResult.Outcome);
 
         var reorderEvent =
@@ -264,7 +275,7 @@ public sealed class ReorderWorkflowTests
             reorderEvent.InventoryItemId);
 
         Assert.Equal(
-            "Processed",
+            ReorderEventStatuses.SupplierAccepted,
             reorderEvent.Status);
 
         Assert.Equal(
@@ -435,5 +446,31 @@ public sealed class ReorderWorkflowTests
 
         Assert.Single(
             _factory.MessagePublisher.Messages);
+    }
+
+    private sealed class AcceptingSupplierOrderClient
+        : ISupplierOrderClient
+    {
+        public Task<SupplierOrderSubmissionResult>
+            SubmitOrderAsync(
+                SupplierOrderRequest request,
+                string idempotencyKey,
+                string correlationId,
+                CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(
+                SupplierOrderSubmissionResult.Accepted(
+                    Guid.Parse(
+                        "ea49e210-aedd-4eb8-94a8-c266670ef9ec"),
+                    "Accepted",
+                    new DateTime(
+                        2026,
+                        8,
+                        3,
+                        12,
+                        0,
+                        0,
+                        DateTimeKind.Utc)));
+        }
     }
 }

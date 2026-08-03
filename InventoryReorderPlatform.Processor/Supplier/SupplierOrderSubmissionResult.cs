@@ -26,7 +26,7 @@ public sealed record SupplierOrderSubmissionResult(
         return new SupplierOrderSubmissionResult(
             SupplierOrderSubmissionOutcome.Rejected,
             SupplierOrderId: null,
-            SupplierOrderStatus: null,
+            SupplierOrderStatus: "Rejected",
             AcceptedAtUtc: null,
             rejectionReason);
     }

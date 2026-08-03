@@ -224,6 +224,7 @@ public class Worker : BackgroundService
             result = await processor.ProcessAsync(
                 reorderMessage,
                 message.MessageId,
+                correlationId,
                 rawPayload,
                 message.DeliveryCount,
                 cancellationToken);
@@ -261,10 +262,10 @@ public class Worker : BackgroundService
 
         switch (result.Outcome)
         {
-            case ReorderProcessingOutcome.Processed:
+            case ReorderProcessingOutcome.SupplierAccepted:
                 activity?.SetTag(
                     "reorder.outcome",
-                    "processed");
+                    "supplier-accepted");
 
                 activity?.SetTag(
                     "messaging.settlement",
@@ -277,10 +278,42 @@ public class Worker : BackgroundService
                     cancellationToken);
 
                 _logger.LogInformation(
-                    "Completed processed message {MessageId} with " +
-                    "CorrelationId {CorrelationId}.",
+                    "Completed supplier-accepted message " +
+                    "{MessageId} with CorrelationId " +
+                    "{CorrelationId}.",
                     message.MessageId,
                     correlationId);
+
+                break;
+
+            case ReorderProcessingOutcome.SupplierRejected:
+                activity?.SetTag(
+                    "reorder.outcome",
+                    "supplier-rejected");
+
+                activity?.SetTag(
+                    "messaging.settlement",
+                    "completed");
+
+                activity?.SetTag(
+                    "supplier.rejection.reason",
+                    result.Reason);
+
+                // This is a handled terminal business outcome rather
+                // than an unhandled technical failure.
+                activity?.SetStatus(ActivityStatusCode.Ok);
+
+                await receiver.CompleteMessageAsync(
+                    message,
+                    cancellationToken);
+
+                _logger.LogWarning(
+                    "Completed permanently rejected message " +
+                    "{MessageId} with CorrelationId " +
+                    "{CorrelationId}. Reason: {Reason}",
+                    message.MessageId,
+                    correlationId,
+                    result.Reason);
 
                 break;
 
