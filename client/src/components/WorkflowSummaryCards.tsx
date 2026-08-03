@@ -4,38 +4,68 @@ interface Props {
   events: ReorderEvent[]
 }
 
+interface WorkflowCounts {
+  pending: number
+  supplierAccepted: number
+  supplierRejected: number
+}
+
 export function WorkflowSummaryCards({ events }: Props) {
-  const pendingEvents = events.filter(
-    (event) => event.status.toLowerCase() === 'pending',
-  ).length
+  const counts = events.reduce<WorkflowCounts>(
+    (currentCounts, event) => {
+      switch (event.status.toLowerCase()) {
+        case 'pending':
+          currentCounts.pending += 1
+          break
 
-  const processedEvents = events.filter((event) => {
-    const status = event.status.toLowerCase()
+        case 'supplieraccepted':
+          currentCounts.supplierAccepted += 1
+          break
 
-    return status === 'processed' || status === 'completed'
-  }).length
+        case 'supplierrejected':
+          currentCounts.supplierRejected += 1
+          break
+      }
 
-  const failedEvents = events.filter((event) => {
-    const status = event.status.toLowerCase()
-
-    return status.includes('fail') || status.includes('error')
-  }).length
+      return currentCounts
+    },
+    {
+      pending: 0,
+      supplierAccepted: 0,
+      supplierRejected: 0,
+    },
+  )
 
   return (
     <section className="summary-grid">
       <article className="card stat-card">
-        <span className="stat-label">Pending Reorder Events</span>
-        <strong className="stat-value">{pendingEvents}</strong>
+        <span className="stat-label">
+          Pending Reorder Events
+        </span>
+
+        <strong className="stat-value">
+          {counts.pending}
+        </strong>
       </article>
 
       <article className="card stat-card">
-        <span className="stat-label">Processed Reorder Events</span>
-        <strong className="stat-value">{processedEvents}</strong>
+        <span className="stat-label">
+          Supplier Accepted
+        </span>
+
+        <strong className="stat-value">
+          {counts.supplierAccepted}
+        </strong>
       </article>
 
       <article className="card stat-card">
-        <span className="stat-label">Failed Reorder Events</span>
-        <strong className="stat-value">{failedEvents}</strong>
+        <span className="stat-label">
+          Supplier Rejected
+        </span>
+
+        <strong className="stat-value">
+          {counts.supplierRejected}
+        </strong>
       </article>
     </section>
   )
