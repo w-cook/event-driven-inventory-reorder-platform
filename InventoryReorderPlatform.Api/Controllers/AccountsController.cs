@@ -30,6 +30,15 @@ public sealed class AccountsController : ControllerBase
     }
 
     [HttpGet]
+    [EndpointSummary("List user accounts")]
+    [EndpointDescription(
+        "Returns all user accounts ordered by email address, including each " +
+        "account's roles, active status, and creation time.")]
+    [ProducesResponseType<IReadOnlyList<AccountResponse>>(
+        StatusCodes.Status200OK,
+        "application/json")]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<ActionResult<IReadOnlyList<AccountResponse>>> GetAll(
         CancellationToken cancellationToken)
     {
@@ -66,6 +75,22 @@ public sealed class AccountsController : ControllerBase
     }
 
     [HttpPost]
+    [EndpointSummary("Create a user account")]
+    [EndpointDescription(
+        "Creates an active user account with one assigned role. Valid roles " +
+        "are Viewer, Operator, and Administrator.")]
+    [Consumes("application/json")]
+    [ProducesResponseType<AccountResponse>(
+        StatusCodes.Status201Created,
+        "application/json")]
+    [ProducesResponseType<ValidationProblemDetails>(
+        StatusCodes.Status400BadRequest,
+        "application/problem+json")]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType<ProblemDetails>(
+        StatusCodes.Status409Conflict,
+        "application/problem+json")]
     public async Task<ActionResult<AccountResponse>> Create(
         CreateAccountRequest request,
         CancellationToken cancellationToken)
@@ -166,6 +191,26 @@ public sealed class AccountsController : ControllerBase
     }
 
     [HttpPatch("{id}/role")]
+    [EndpointSummary("Change an account role")]
+    [EndpointDescription(
+        "Replaces the account's existing role assignments with one role. " +
+        "Changing a role revokes previously issued JWTs. The final active " +
+        "Administrator cannot be assigned another role.")]
+    [Consumes("application/json")]
+    [ProducesResponseType<AccountResponse>(
+        StatusCodes.Status200OK,
+        "application/json")]
+    [ProducesResponseType<ValidationProblemDetails>(
+        StatusCodes.Status400BadRequest,
+        "application/problem+json")]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType<ProblemDetails>(
+        StatusCodes.Status404NotFound,
+        "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(
+        StatusCodes.Status409Conflict,
+        "application/problem+json")]
     public async Task<ActionResult<AccountResponse>> UpdateRole(
         [FromRoute] string id,
         UpdateAccountRoleRequest request,
@@ -353,10 +398,29 @@ public sealed class AccountsController : ControllerBase
     }
 
     [HttpPatch("{id}/status")]
+    [EndpointSummary("Change an account status")]
+    [EndpointDescription(
+        "Activates or deactivates an account and revokes previously issued " +
+        "JWTs. The final active Administrator cannot be deactivated.")]
+    [Consumes("application/json")]
+    [ProducesResponseType<AccountResponse>(
+        StatusCodes.Status200OK,
+        "application/json")]
+    [ProducesResponseType<ValidationProblemDetails>(
+        StatusCodes.Status400BadRequest,
+        "application/problem+json")]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType<ProblemDetails>(
+        StatusCodes.Status404NotFound,
+        "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(
+        StatusCodes.Status409Conflict,
+        "application/problem+json")]
     public async Task<ActionResult<AccountResponse>> UpdateStatus(
-    [FromRoute] string id,
-    UpdateAccountStatusRequest request,
-    CancellationToken cancellationToken)
+        [FromRoute] string id,
+        UpdateAccountStatusRequest request,
+        CancellationToken cancellationToken)
     {
         var user =
             await _userManager.FindByIdAsync(id);
