@@ -8,7 +8,7 @@ The work preserves the original event-driven architecture while adding operator 
 
 ## Current Status
 
-Phases 1–11 are complete. Phase 12 covers complete endpoint documentation, generated OpenAPI review, and final verification.
+All 12 phases are complete. The Event-Driven Inventory Reorder Platform now includes an authenticated role-aware operations client, reliable queue processing, an independently hosted mock supplier boundary, durable cross-service idempotency, configurable failure simulation, distributed tracing, comprehensive automated verification, complete API documentation, and reproducible Aspire and Docker/local operating procedures.
 
 ## Phase Completion Standard
 
@@ -198,7 +198,7 @@ The final step of each phase must:
 - [x] verify both Aspire and Docker/local runtime modes
 - [x] verify the complete distributed trace
 - [x] confirm that no secrets or unsafe mock defaults are committed
-- [ ] complete a final README, screenshots, and portfolio-claims review
+- [x] complete a final README, screenshots, and portfolio-claims review
 
 
 ## Non-Goals
