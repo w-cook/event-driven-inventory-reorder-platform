@@ -192,7 +192,7 @@ The final step of each phase must:
 - [x] inspect and verify the generated OpenAPI documents
 - [x] verify normal supplier acceptance
 - [x] verify delayed supplier behavior
-- [ ] verify transient failure and recovery
+- [x] verify transient failure and recovery
 - [ ] verify permanent rejection behavior
 - [ ] verify supplier idempotency under duplicate submission
 - [ ] verify both Aspire and Docker/local runtime modes
