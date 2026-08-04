@@ -197,7 +197,7 @@ The final step of each phase must:
 - [ ] verify supplier idempotency under duplicate submission
 - [ ] verify both Aspire and Docker/local runtime modes
 - [ ] verify the complete distributed trace
-- [ ] confirm that no secrets or unsafe mock defaults are committed
+- [x] confirm that no secrets or unsafe mock defaults are committed
 - [ ] complete a final README, screenshots, and portfolio-claims review
 
 
