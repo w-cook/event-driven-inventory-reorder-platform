@@ -186,9 +186,9 @@ The final step of each phase must:
 - [x] verify documentation coverage for health, audit, account-management, workflow, and supplier endpoints
 - [x] update the architecture diagram and component responsibilities for the supplier integration
 - [x] consolidate account bootstrap, token usage, supplier configuration, mock behavior, and recovery procedures in the operational runbook
-- [ ] run `dotnet build`
-- [ ] run the full automated test suite
-- [ ] run the frontend production build
+- [x] run `dotnet build`
+- [x] run the full automated test suite
+- [x] run the frontend production build
 - [x] inspect and verify the generated OpenAPI documents
 - [ ] verify normal supplier acceptance
 - [ ] verify delayed supplier behavior
