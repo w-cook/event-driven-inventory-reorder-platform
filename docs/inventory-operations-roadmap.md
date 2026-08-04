@@ -194,7 +194,7 @@ The final step of each phase must:
 - [x] verify delayed supplier behavior
 - [x] verify transient failure and recovery
 - [x] verify permanent rejection behavior
-- [ ] verify supplier idempotency under duplicate submission
+- [x] verify supplier idempotency under duplicate submission
 - [ ] verify both Aspire and Docker/local runtime modes
 - [x] verify the complete distributed trace
 - [x] confirm that no secrets or unsafe mock defaults are committed
