@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using InventoryReorderPlatform.SupplierMockApi.Behavior;
 using InventoryReorderPlatform.SupplierMockApi.Contracts;
 using InventoryReorderPlatform.SupplierMockApi.Data;
@@ -28,15 +29,47 @@ public sealed class SupplierOrdersController : ControllerBase
     }
 
     [HttpPost]
+    [EndpointSummary("Submit a supplier order")]
+    [EndpointDescription(
+        "Submits an inventory reorder to the supplier. Idempotent replays " +
+        "with the same key and payload return the existing accepted order. " +
+        "Reusing a key with a different payload returns a conflict. Configured " +
+        "supplier behavior may delay, temporarily fail, or permanently reject " +
+        "the submission.")]
+    [Consumes("application/json")]
+    [ProducesResponseType<SupplierOrderResponse>(
+        StatusCodes.Status200OK,
+        "application/json")]
+    [ProducesResponseType<SupplierOrderResponse>(
+        StatusCodes.Status201Created,
+        "application/json")]
+    [ProducesResponseType<ValidationProblemDetails>(
+        StatusCodes.Status400BadRequest,
+        "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(
+        StatusCodes.Status409Conflict,
+        "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(
+        StatusCodes.Status422UnprocessableEntity,
+        "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(
+        StatusCodes.Status503ServiceUnavailable,
+        "application/problem+json")]
     public async Task<ActionResult<SupplierOrderResponse>> Create(
         [FromBody] CreateSupplierOrderRequest request,
+        [FromHeader(Name = SupplierApiHeaders.IdempotencyKey)]
+        [Required]
+        [StringLength(MaximumIdempotencyKeyLength)]
+        string? idempotencyKeyHeader,
+        [FromHeader(Name = SupplierApiHeaders.CorrelationId)]
+        string? correlationIdHeader,
         CancellationToken cancellationToken)
     {
         if (!Request.Headers.TryGetValue(
                 SupplierApiHeaders.IdempotencyKey,
                 out var idempotencyKeyValues)
             || idempotencyKeyValues.Count != 1
-            || string.IsNullOrWhiteSpace(idempotencyKeyValues[0]))
+            || string.IsNullOrWhiteSpace(idempotencyKeyHeader))
         {
             ModelState.AddModelError(
                 SupplierApiHeaders.IdempotencyKey,
@@ -46,7 +79,7 @@ public sealed class SupplierOrdersController : ControllerBase
         }
 
         var idempotencyKey =
-            idempotencyKeyValues[0]!.Trim();
+            idempotencyKeyHeader.Trim();
 
         if (idempotencyKey.Length > MaximumIdempotencyKeyLength)
         {
@@ -57,7 +90,7 @@ public sealed class SupplierOrdersController : ControllerBase
             return ValidationProblem(ModelState);
         }
 
-        var correlationId = ResolveCorrelationId();
+        var correlationId = ResolveCorrelationId(correlationIdHeader);
 
         using var loggingScope =
             _logger.BeginScope(
@@ -112,9 +145,9 @@ public sealed class SupplierOrdersController : ControllerBase
         }
 
         var behaviorResult =
-    await _behaviorSimulator.EvaluateAsync(
-        idempotencyKey,
-        cancellationToken);
+            await _behaviorSimulator.EvaluateAsync(
+                idempotencyKey,
+                cancellationToken);
 
         if (behaviorResult.Outcome ==
             SupplierBehaviorOutcome.TransientFailure)
@@ -302,7 +335,7 @@ public sealed class SupplierOrdersController : ControllerBase
         };
     }
 
-    private string ResolveCorrelationId()
+    private string ResolveCorrelationId(string? correlationIdHeader)
     {
         if (Request.Headers.TryGetValue(
                 SupplierApiHeaders.CorrelationId,
@@ -310,7 +343,7 @@ public sealed class SupplierOrdersController : ControllerBase
             && correlationValues.Count == 1)
         {
             var correlationId =
-                correlationValues[0]?.Trim();
+                correlationIdHeader?.Trim();
 
             if (!string.IsNullOrWhiteSpace(correlationId))
             {
