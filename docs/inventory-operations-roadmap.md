@@ -176,20 +176,20 @@ The final step of each phase must:
 
 ### Phase 12 — Complete API Documentation and Final Verification
 
-- [ ] document every public inventory-platform and supplier API endpoint
-- [ ] document authentication and authorization requirements
-- [ ] document request and response models
-- [ ] document validation rules and expected status codes
-- [ ] add OpenAPI response metadata and practical examples
-- [ ] document supplier idempotency requirements and outcomes
-- [ ] consolidate correlation-header and trace-propagation documentation
-- [ ] verify documentation coverage for health, audit, account-management, workflow, and supplier endpoints
-- [ ] update the architecture diagram and component responsibilities for the supplier integration
-- [ ] consolidate account bootstrap, token usage, supplier configuration, mock behavior, and recovery procedures in the operational runbook
+- [x] document every public inventory-platform and supplier API endpoint
+- [x] document authentication and authorization requirements
+- [x] document request and response models
+- [x] document validation rules and expected status codes
+- [x] add OpenAPI response metadata and practical examples
+- [x] document supplier idempotency requirements and outcomes
+- [x] consolidate correlation-header and trace-propagation documentation
+- [x] verify documentation coverage for health, audit, account-management, workflow, and supplier endpoints
+- [x] update the architecture diagram and component responsibilities for the supplier integration
+- [x] consolidate account bootstrap, token usage, supplier configuration, mock behavior, and recovery procedures in the operational runbook
 - [ ] run `dotnet build`
 - [ ] run the full automated test suite
 - [ ] run the frontend production build
-- [ ] inspect and verify the generated OpenAPI documents
+- [x] inspect and verify the generated OpenAPI documents
 - [ ] verify normal supplier acceptance
 - [ ] verify delayed supplier behavior
 - [ ] verify transient failure and recovery

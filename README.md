@@ -616,6 +616,19 @@ The event `status` is `Pending`, `SupplierAccepted`, or `SupplierRejected` for c
 
 Audit-record access and all account-management requests require the Administrator role.
 
+### OpenAPI documents
+
+In Development mode, both APIs expose generated OpenAPI documents:
+
+```text
+Inventory API: /openapi/v1.json
+Supplier API:  /openapi/v1.json
+```
+
+The inventory document defines JWT bearer authentication for protected operations while leaving the login endpoint anonymous. Both documents include operation summaries, expected response codes, validation constraints, and practical request and response examples.
+
+For the complete human-readable contract, see the [API reference](docs/api-reference.md).
+
 The complete authenticated manual-verification sequence is maintained in:
 
 ```text
@@ -680,17 +693,19 @@ Direct Azure Service Bus settlement tests are not currently included because the
 
 Each document has a focused purpose:
 
-- [Expansion roadmap](docs/inventory-operations-roadmap.md) — completed and remaining expansion scope
-- [System architecture](docs/architecture.md) — components, runtime boundaries, data flow, persistence responsibilities, messaging, authentication, and observability design
-- [Engineering case study](docs/inventory-operations-case-study.md) — design decisions, rationale, tradeoffs, and portfolio value
+- [API reference](docs/api-reference.md) — inventory and supplier endpoints, authentication, authorization, models, validation rules, status codes, headers, and examples
+- [Operational runbook](docs/operational-runbook.md) — local configuration, Aspire and Docker startup, authentication, health checks, supplier behavior, shutdown, and reset procedures
+- [Expansion roadmap](docs/inventory-operations-roadmap.md) — completed expansion scope and final verification status
+- [System architecture](docs/architecture.md) — components, runtime boundaries, data flow, persistence responsibilities, messaging, authentication, supplier integration, and observability design
+- [Engineering case study](docs/inventory-operations-case-study.md) — design decisions, rationale, tradeoffs, automated verification, and portfolio value
 - [Failure scenarios](docs/failure-scenarios.md) — expected failure behavior, recovery expectations, evidence, and known limitations
-- [Observability runbook](docs/observability-runbook.md) — operational steps for tracing and diagnosing a workflow
-- [Frontend README](client/README.md) — client-specific startup, proxy configuration, environment settings, and scripts
-- [Mock supplier service](docs/mock-supplier-service.md) — supplier contracts, idempotency behavior, simulation modes, persistence ownership, runtime configuration, and automated verification
+- [Observability runbook](docs/observability-runbook.md) — operational steps for tracing and diagnosing a correlated reorder workflow
+- [Mock supplier service](docs/mock-supplier-service.md) — supplier contracts, idempotency behavior, simulation modes, persistence ownership, runtime configuration, and verification
+- [Frontend README](client/README.md) — client startup, proxy configuration, environment settings, and npm scripts
 
-Phases 1–11 are complete. The project includes an independently hosted mock supplier API with separate persistence, durable idempotency, configurable failure simulation, Processor integration, supplier-outcome persistence, frontend visibility, integration tests, and Aspire and Docker orchestration.
+Phases 1–11 are complete. Phase 12 has added complete inventory and supplier API reference documentation, generated OpenAPI metadata and examples, JWT bearer security metadata, and a consolidated operational runbook.
 
-Phase 12 remains reserved for complete endpoint documentation, generated OpenAPI review, and final verification.
+Final Phase 12 verification covers the complete automated test suite, both local runtime modes, supplier behavior modes, duplicate-submission idempotency, distributed tracing, committed-secret review, and final portfolio presentation.
 
 ## Scope and Limitations
 
