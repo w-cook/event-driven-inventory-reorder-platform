@@ -191,7 +191,7 @@ The final step of each phase must:
 - [x] run the frontend production build
 - [x] inspect and verify the generated OpenAPI documents
 - [x] verify normal supplier acceptance
-- [ ] verify delayed supplier behavior
+- [x] verify delayed supplier behavior
 - [ ] verify transient failure and recovery
 - [ ] verify permanent rejection behavior
 - [ ] verify supplier idempotency under duplicate submission
