@@ -83,6 +83,9 @@ builder.Services.AddOpenApi(options =>
 
     options.AddOperationTransformer<
         AuthorizationOperationTransformer>();
+
+    options.AddSchemaTransformer<
+        ApiSchemaExamplesTransformer>();
 });
 
 builder.Services.AddHttpContextAccessor();
