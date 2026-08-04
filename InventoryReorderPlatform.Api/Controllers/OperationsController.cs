@@ -24,6 +24,18 @@ public class OperationsController : ControllerBase
     }
 
     [HttpGet("health")]
+    [EndpointSummary("Get operations health")]
+    [EndpointDescription(
+        "Checks application database connectivity and returns inventory-item " +
+        "and reorder-event counts when the database is available.")]
+    [ProducesResponseType<OperationsHealthResponse>(
+        StatusCodes.Status200OK,
+        "application/json")]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType<OperationsHealthResponse>(
+        StatusCodes.Status503ServiceUnavailable,
+        "application/json")]
     public async Task<ActionResult<OperationsHealthResponse>> GetHealth(
         CancellationToken cancellationToken)
     {
