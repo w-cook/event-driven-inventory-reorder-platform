@@ -75,6 +75,7 @@ builder.Services.AddScoped<
     JwtTokenService>();
 
 builder.Services.AddControllers();
+builder.Services.AddOpenApi();
 
 builder.Services.AddHttpContextAccessor();
 
@@ -224,6 +225,11 @@ builder.Services.AddSingleton<
     ReorderMessagePublisher>();
 
 var app = builder.Build();
+
+if (app.Environment.IsDevelopment())
+{
+    app.MapOpenApi();
+}
 
 using (var scope = app.Services.CreateScope())
 {
