@@ -190,13 +190,13 @@ The final step of each phase must:
 - [x] run the full automated test suite
 - [x] run the frontend production build
 - [x] inspect and verify the generated OpenAPI documents
-- [ ] verify normal supplier acceptance
+- [x] verify normal supplier acceptance
 - [ ] verify delayed supplier behavior
 - [ ] verify transient failure and recovery
 - [ ] verify permanent rejection behavior
 - [ ] verify supplier idempotency under duplicate submission
 - [ ] verify both Aspire and Docker/local runtime modes
-- [ ] verify the complete distributed trace
+- [x] verify the complete distributed trace
 - [x] confirm that no secrets or unsafe mock defaults are committed
 - [ ] complete a final README, screenshots, and portfolio-claims review
 
