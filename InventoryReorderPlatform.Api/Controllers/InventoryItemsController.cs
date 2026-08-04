@@ -33,6 +33,18 @@ namespace InventoryReorderPlatform.Api.Controllers
 
         [HttpGet("{id:int}")]
         [Authorize(Policy = AppPolicies.InventoryRead)]
+        [EndpointSummary("Get an inventory item")]
+        [EndpointDescription(
+            "Returns one inventory item, including its stock level, reorder " +
+            "configuration, current workflow status, and timestamps.")]
+        [ProducesResponseType<InventoryItemResponse>(
+            StatusCodes.Status200OK,
+            "application/json")]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType<string>(
+            StatusCodes.Status404NotFound,
+            "text/plain")]
         public async Task<ActionResult<InventoryItemResponse>> GetById([FromRoute] int id)
         {
             var inventoryItem = await _dbContext.InventoryItems
@@ -48,6 +60,15 @@ namespace InventoryReorderPlatform.Api.Controllers
 
         [HttpGet]
         [Authorize(Policy = AppPolicies.InventoryRead)]
+        [EndpointSummary("List inventory items")]
+        [EndpointDescription(
+            "Returns all inventory items ordered from most recently created to " +
+            "oldest, including stock levels and reorder configuration.")]
+        [ProducesResponseType<IEnumerable<InventoryItemResponse>>(
+            StatusCodes.Status200OK,
+            "application/json")]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
         public async Task<ActionResult<IEnumerable<InventoryItemResponse>>> GetAll()
         {
             var inventoryItems = await _dbContext.InventoryItems
@@ -71,6 +92,20 @@ namespace InventoryReorderPlatform.Api.Controllers
 
         [HttpPost]
         [Authorize(Policy = AppPolicies.InventoryOperate)]
+        [EndpointSummary("Create an inventory item")]
+        [EndpointDescription(
+            "Creates an inventory item. When the initial quantity is at or below " +
+            "the reorder threshold, the operation also creates a pending reorder " +
+            "event and publishes a reorder message.")]
+        [Consumes("application/json")]
+        [ProducesResponseType<InventoryItemResponse>(
+            StatusCodes.Status201Created,
+            "application/json")]
+        [ProducesResponseType<ValidationProblemDetails>(
+            StatusCodes.Status400BadRequest,
+            "application/problem+json")]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
         public async Task<ActionResult<InventoryItemResponse>> Create(CreateInventoryItemRequest request)
         {
             var inventoryItem = new InventoryItem
@@ -130,6 +165,23 @@ namespace InventoryReorderPlatform.Api.Controllers
 
         [HttpPut("{id:int}")]
         [Authorize(Policy = AppPolicies.InventoryOperate)]
+        [EndpointSummary("Update an inventory item")]
+        [EndpointDescription(
+            "Replaces an inventory item's editable values. Crossing from above " +
+            "the reorder threshold to at or below it creates a pending reorder " +
+            "event and publishes a reorder message.")]
+        [Consumes("application/json")]
+        [ProducesResponseType<InventoryItemResponse>(
+            StatusCodes.Status200OK,
+            "application/json")]
+        [ProducesResponseType<ValidationProblemDetails>(
+            StatusCodes.Status400BadRequest,
+            "application/problem+json")]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType<string>(
+            StatusCodes.Status404NotFound,
+            "text/plain")]
         public async Task<ActionResult<InventoryItemResponse>> UpdateInventoryItem(
             [FromRoute] int id,
             UpdateInventoryItemRequest request)

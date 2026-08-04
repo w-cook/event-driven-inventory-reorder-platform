@@ -27,6 +27,20 @@ public sealed class AuthController : ControllerBase
 
     [HttpPost("login")]
     [AllowAnonymous]
+    [EndpointSummary("Log in")]
+    [EndpointDescription(
+        "Authenticates an active user account and returns a JWT bearer token " +
+        "with the user's assigned roles.")]
+    [Consumes("application/json")]
+    [ProducesResponseType<LoginResponse>(
+        StatusCodes.Status200OK,
+        "application/json")]
+    [ProducesResponseType<ValidationProblemDetails>(
+        StatusCodes.Status400BadRequest,
+        "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(
+        StatusCodes.Status401Unauthorized,
+        "application/problem+json")]
     public async Task<ActionResult<LoginResponse>> Login(
         LoginRequest request)
     {

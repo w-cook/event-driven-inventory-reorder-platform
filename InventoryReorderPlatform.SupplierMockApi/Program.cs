@@ -1,5 +1,6 @@
 using InventoryReorderPlatform.SupplierMockApi.Behavior;
 using InventoryReorderPlatform.SupplierMockApi.Data;
+using InventoryReorderPlatform.SupplierMockApi.OpenApi;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -27,7 +28,11 @@ builder.Services.AddSingleton<
     SupplierBehaviorSimulator>();
 
 builder.Services.AddControllers();
-builder.Services.AddOpenApi();
+builder.Services.AddOpenApi(options =>
+{
+    options.AddSchemaTransformer<
+        SupplierSchemaExamplesTransformer>();
+});
 
 var app = builder.Build();
 

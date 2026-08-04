@@ -2,6 +2,7 @@ using System.Security.Claims;
 using System.Text;
 using Azure.Messaging.ServiceBus;
 using InventoryReorderPlatform.Api.Middleware;
+using InventoryReorderPlatform.Api.OpenApi;
 using InventoryReorderPlatform.Api.Security;
 using InventoryReorderPlatform.Api.Services;
 using InventoryReorderPlatform.Contracts.Configuration;
@@ -75,6 +76,17 @@ builder.Services.AddScoped<
     JwtTokenService>();
 
 builder.Services.AddControllers();
+builder.Services.AddOpenApi(options =>
+{
+    options.AddDocumentTransformer<
+        BearerSecuritySchemeTransformer>();
+
+    options.AddOperationTransformer<
+        AuthorizationOperationTransformer>();
+
+    options.AddSchemaTransformer<
+        ApiSchemaExamplesTransformer>();
+});
 
 builder.Services.AddHttpContextAccessor();
 
@@ -224,6 +236,11 @@ builder.Services.AddSingleton<
     ReorderMessagePublisher>();
 
 var app = builder.Build();
+
+if (app.Environment.IsDevelopment())
+{
+    app.MapOpenApi();
+}
 
 using (var scope = app.Services.CreateScope())
 {

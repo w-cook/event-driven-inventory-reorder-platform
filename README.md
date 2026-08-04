@@ -4,13 +4,21 @@ A distributed .NET business application that models an internal inventory reorde
 
 The project focuses on practical backend and distributed-system concerns while remaining fully reproducible with local, zero-cost infrastructure.
 
+## What This Application Is
+
+This application is a prototype internal operations system for organizations that keep physical inventory and need a reliable way to begin reordering before stock runs out. A warehouse, parts department, distributor, repair operation, or small manufacturer could use a system like this to track stock levels, define when each item should be reordered, control who is allowed to view or change inventory, and follow each reorder from the moment it is triggered through supplier acceptance or rejection.
+
+For example, when an item falls below its configured threshold, the application creates a reorder request automatically and sends it to background processing rather than making the user wait for the entire workflow to finish. Staff can continue using the system while the request is processed. If the supplier is temporarily unavailable, the system can retry safely, and duplicate messages or repeated supplier submissions are prevented from creating duplicate orders. Administrators can also review who changed inventory or managed user accounts.
+
+The application is designed with cloud deployment in mind. Its API, background worker, supplier integration, databases, message queue, health checks, distributed tracing, and containerized services are separated in ways that can map to managed cloud services. The repository runs locally through .NET Aspire and Docker so the complete system can be evaluated without paid infrastructure, but it does not claim an active production deployment, a real supplier connection, or completed production hardening.
+
 ## Screenshots
 
 ### JWT Login
 
 ![Inventory Operations Dashboard login screen](docs/images/login-screen.png)
 
-The React client authenticates application-managed users through the protected login endpoint and keeps the returned JWT access token only in frontend memory.
+The React client authenticates application-managed users through the login endpoint and keeps the returned JWT access token only in frontend memory.
 
 ### Operations Dashboard
 
@@ -18,11 +26,11 @@ The React client authenticates application-managed users through the protected l
 
 The authenticated Dashboard presents inventory and workflow summary metrics beside a compact System Health card, while the persistent header keeps the signed-in user and assigned roles visible.
 
-### Supplier Workflow History
+### Privileged Inventory Management
 
-![Supplier reorder workflow history](docs/images/supplier-workflow-history.png)
+![Operator and Administrator inventory management interface](docs/images/inventory-management.png)
 
-The dedicated Workflow view shows pending, supplier-accepted, and supplier-rejected reorder events together with quantity-at-trigger, immutable requested quantity, supplier confirmation details, and readable rejection reasons. The view can refresh its data without clearing the in-memory login session.
+The Inventory view gives Operators and Administrators compact create and edit controls alongside the current inventory table. Successful mutations reload inventory, workflow, and health data from authoritative backend state.
 
 ### Low-Stock Review
 
@@ -30,11 +38,11 @@ The dedicated Workflow view shows pending, supplier-accepted, and supplier-rejec
 
 The Inventory view can be narrowed to items requiring attention while retaining current quantity, reorder threshold, configured reorder quantity, status, and available management actions.
 
-### Privileged Inventory Management
+### Supplier Workflow History
 
-![Operator and Administrator inventory management interface](docs/images/inventory-management.png)
+![Supplier reorder workflow history](docs/images/supplier-workflow-history.png)
 
-The Inventory view gives Operators and Administrators compact create and edit controls alongside the current inventory table. Successful mutations reload inventory, workflow, and health data from authoritative backend state.
+The dedicated Workflow view shows pending, supplier-accepted, and supplier-rejected reorder events together with quantity-at-trigger, immutable requested quantity, supplier confirmation details, and readable rejection reasons. The view can refresh its data without clearing the in-memory login session.
 
 ### Administrator Audit Review
 
@@ -370,7 +378,7 @@ BOOTSTRAP_ADMIN_PASSWORD=<strong-local-administrator-password>
 
 Docker Compose injects these values into the API container. The actual .env file is excluded from source control; only the placeholder .env.example file is tracked.
 
-No secret values are stored in the repository.
+No real secret values are stored in the repository. Tracked configuration contains placeholders and disposable local-development defaults only.
 
 ### Aspire Mode
 
@@ -613,8 +621,20 @@ Reorder-event responses expose supplier workflow details when available:
 
 The event `status` is `Pending`, `SupplierAccepted`, or `SupplierRejected` for current workflows. Legacy `Processed` rows may remain from workflows completed before supplier submission was introduced.
 
-
 Audit-record access and all account-management requests require the Administrator role.
+
+### OpenAPI documents
+
+In Development mode, both APIs expose generated OpenAPI documents:
+
+```text
+Inventory API: /openapi/v1.json
+Supplier API:  /openapi/v1.json
+```
+
+The inventory document defines JWT bearer authentication for protected operations while leaving the login endpoint anonymous. Both documents include operation summaries, expected response codes, validation constraints, and practical request and response examples.
+
+For the complete human-readable contract, see the [API reference](docs/api-reference.md).
 
 The complete authenticated manual-verification sequence is maintained in:
 
@@ -680,17 +700,19 @@ Direct Azure Service Bus settlement tests are not currently included because the
 
 Each document has a focused purpose:
 
-- [Expansion roadmap](docs/inventory-operations-roadmap.md) — completed and remaining expansion scope
-- [System architecture](docs/architecture.md) — components, runtime boundaries, data flow, persistence responsibilities, messaging, authentication, and observability design
-- [Engineering case study](docs/inventory-operations-case-study.md) — design decisions, rationale, tradeoffs, and portfolio value
+- [API reference](docs/api-reference.md) — inventory and supplier endpoints, authentication, authorization, models, validation rules, status codes, headers, and examples
+- [Operational runbook](docs/operational-runbook.md) — local configuration, Aspire and Docker startup, authentication, health checks, supplier behavior, shutdown, and reset procedures
+- [Expansion roadmap](docs/inventory-operations-roadmap.md) — completed expansion scope and final verification status
+- [System architecture](docs/architecture.md) — components, runtime boundaries, data flow, persistence responsibilities, messaging, authentication, supplier integration, and observability design
+- [Engineering case study](docs/inventory-operations-case-study.md) — design decisions, rationale, tradeoffs, automated verification, and portfolio value
 - [Failure scenarios](docs/failure-scenarios.md) — expected failure behavior, recovery expectations, evidence, and known limitations
-- [Observability runbook](docs/observability-runbook.md) — operational steps for tracing and diagnosing a workflow
-- [Frontend README](client/README.md) — client-specific startup, proxy configuration, environment settings, and scripts
-- [Mock supplier service](docs/mock-supplier-service.md) — supplier contracts, idempotency behavior, simulation modes, persistence ownership, runtime configuration, and automated verification
+- [Observability runbook](docs/observability-runbook.md) — operational steps for tracing and diagnosing a correlated reorder workflow
+- [Mock supplier service](docs/mock-supplier-service.md) — supplier contracts, idempotency behavior, simulation modes, persistence ownership, runtime configuration, and verification
+- [Frontend README](client/README.md) — client startup, proxy configuration, environment settings, and npm scripts
 
-Phases 1–11 are complete. The project includes an independently hosted mock supplier API with separate persistence, durable idempotency, configurable failure simulation, Processor integration, supplier-outcome persistence, frontend visibility, integration tests, and Aspire and Docker orchestration.
+All 12 expansion phases are complete. The final phase added complete inventory and supplier API reference documentation, generated OpenAPI metadata and examples, JWT bearer security metadata, and a consolidated operational runbook.
 
-Phase 12 remains reserved for complete endpoint documentation, generated OpenAPI review, and final verification.
+Final verification covered the automated backend and frontend checks, Aspire and Docker/local runtime modes, normal and delayed supplier acceptance, transient failure recovery, permanent rejection, duplicate-submission idempotency, distributed tracing, and committed configuration safety.
 
 ## Scope and Limitations
 
@@ -737,7 +759,7 @@ Phase 12 remains reserved for complete endpoint documentation, generated OpenAPI
 
 This project is positioned primarily as evidence of practical C#/.NET backend and distributed-system work: authenticated ASP.NET Core APIs, SQL-backed business state, reliable queue processing, idempotent service-to-service HTTP integration, auditing, diagnostics, and automated integration tests.
 
-The React client demonstrates that those backend capabilities are usable through a compact, responsive, role-aware internal business interface rather than existing only as isolated endpoints. Claims remain deliberately conservative, and the full system can be reproduced locally without paid cloud services.
+The React client demonstrates that those backend capabilities are usable through a compact, responsive, role-aware internal business interface rather than existing only as isolated endpoints. The service boundaries, containerization, message-driven processing, health checks, and observability design are intended to support a future move to managed cloud services, although this repository does not claim an active production deployment. Claims remain deliberately conservative, and the full system can be reproduced locally without paid cloud services.
 
 ## License
 

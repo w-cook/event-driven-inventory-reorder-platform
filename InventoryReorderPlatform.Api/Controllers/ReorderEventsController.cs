@@ -20,6 +20,16 @@ namespace InventoryReorderPlatform.Api.Controllers
         }
 
         [HttpGet]
+        [EndpointSummary("List reorder events")]
+        [EndpointDescription(
+            "Returns reorder workflow records ordered from newest to oldest, " +
+            "including the stock quantity at the time of the trigger, the requested " +
+            "reorder quantity, processing status, and supplier-submission details.")]
+        [ProducesResponseType<IEnumerable<ReorderEventResponse>>(
+            StatusCodes.Status200OK,
+            "application/json")]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
         public async Task<ActionResult<IEnumerable<ReorderEventResponse>>> GetAll()
         {
             var reorderEvents = await _dbContext.ReorderEvents
