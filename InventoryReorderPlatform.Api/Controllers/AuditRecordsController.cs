@@ -20,6 +20,16 @@ namespace InventoryReorderPlatform.Api.Controllers
         }
 
         [HttpGet]
+        [EndpointSummary("List audit records")]
+        [EndpointDescription(
+            "Returns application audit records ordered from newest to oldest. " +
+            "Each record identifies the acting user and role, the action performed, " +
+            "the affected entity, optional details, and the occurrence time.")]
+        [ProducesResponseType<IEnumerable<AuditRecordResponse>>(
+            StatusCodes.Status200OK,
+            "application/json")]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
         public async Task<ActionResult<IEnumerable<AuditRecordResponse>>> GetAll(
             CancellationToken cancellationToken)
         {
