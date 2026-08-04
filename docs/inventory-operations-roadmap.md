@@ -195,7 +195,7 @@ The final step of each phase must:
 - [x] verify transient failure and recovery
 - [x] verify permanent rejection behavior
 - [x] verify supplier idempotency under duplicate submission
-- [ ] verify both Aspire and Docker/local runtime modes
+- [x] verify both Aspire and Docker/local runtime modes
 - [x] verify the complete distributed trace
 - [x] confirm that no secrets or unsafe mock defaults are committed
 - [ ] complete a final README, screenshots, and portfolio-claims review
